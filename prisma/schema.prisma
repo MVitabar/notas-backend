@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                     String          @id @default(uuid())
+  email                  String          @unique
+  password               String
+  nombre                 String
+  activo                 Boolean         @default(true)
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  apellido               String?
+  direccion              String?
+  fechaNacimiento        DateTime?
+  telefono               String?
+  contactoEmergencia     String?
+  dni                    String?
+  requiresPasswordChange Boolean         @default(true)
+  telefonoEmergencia     String?
+  rol                    UserRole        @default(USUARIO)
+  calificaciones         Calificacion[]
+  perfilDocente          TeacherProfile?
+  materias               UserMateria[]
+}
+
+model TeacherProfile {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  contactoEmergencia String?
+  telefonoEmergencia String?
+  status             String   @default("active")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  grados             String[] @default([])
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Materia {
+  id             String         @id @default(uuid())
+  nombre         String         @unique
+  descripcion    String?
+  codigo         String         @unique
+  creditos       Int
+  activa         Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  tipoMateriaId  String?
+  calificaciones Calificacion[]
+  tipoMateria    TipoMateria?   @relation(fields: [tipoMateriaId], references: [id])
+  docentes       UserMateria[]
+}
+
+model TipoMateria {
+  id          String    @id @default(uuid())
+  nombre      String    @unique
+  descripcion String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  materias    Materia[]
+}
+
+model PeriodoAcademico {
+  id             String         @id @default(uuid())
+  name           String         @unique
+  startDate      DateTime
+  endDate        DateTime
+  isCurrent      Boolean        @default(false)
+  description    String?
+  status         String         @default("upcoming")
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  calificaciones Calificacion[]
+  userMaterias   UserMateria[]
+
+  @@index([isCurrent])
+  @@index([status])
+}
+
+model UserMateria {
+  id                 String           @id @default(uuid())
+  docenteId          String
+  materiaId          String
+  seccion            String
+  horario            String
+  periodo            String
+  estado             String           @default("activo")
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  periodoAcademicoId String
+  docente            User             @relation(fields: [docenteId], references: [id], onDelete: Cascade)
+  materia            Materia          @relation(fields: [materiaId], references: [id], onDelete: Cascade)
+  periodoAcademico   PeriodoAcademico @relation(fields: [periodoAcademicoId], references: [id])
+
+  @@unique([docenteId, materiaId, seccion, periodoAcademicoId])
+}
+
+model Student {
+  id                 String         @id @default(uuid())
+  nombre             String
+  apellido           String
+  fechaNacimiento    DateTime
+  dni                String         @unique
+  direccion          String?
+  telefono           String?
+  contactoEmergencia String?
+  telefonoEmergencia String?
+  email              String?        @unique
+  activo             Boolean        @default(true)
+  materias           String[]       @default([])
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  grados             String[]       @default([])
+  calificaciones     Calificacion[]
+}
+
+model Calificacion {
+  id               String           @id @default(uuid())
+  estudianteId     String
+  materiaId        String
+  periodoId        String
+  docenteId        String
+  calificacion     Int?             @db.SmallInt
+  tipoEvaluacion   String
+  fecha            DateTime         @default(now())
+  comentario       String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  tipoCalificacion TipoCalificacion
+  valorConceptual  ValorConceptual?
+  docente          User             @relation(fields: [docenteId], references: [id], onDelete: Cascade)
+  estudiante       Student          @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  materia          Materia          @relation(fields: [materiaId], references: [id], onDelete: Cascade)
+  periodo          PeriodoAcademico @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+
+  @@unique([estudianteId, materiaId, periodoId, tipoEvaluacion])
+  @@index([estudianteId])
+  @@index([materiaId])
+  @@index([periodoId])
+  @@index([docenteId])
+}
+
+enum TipoCalificacion {
+  NUMERICA
+  CONCEPTUAL
+}
+
+enum ValorConceptual {
+  DESTACA
+  AVANZA
+  NECESITA_MEJORAR
+  INSATISFACTORIO
+}
+
+enum UserRole {
+  USUARIO
+  DOCENTE
+  ADMIN
+  ESTUDIANTE
+}
