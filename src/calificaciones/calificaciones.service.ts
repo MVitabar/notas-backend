@@ -102,21 +102,27 @@ export class CalificacionesService {
       throw new BadRequestException('Se requieren el ID del estudiante y del período');
     }
     
-    // Si hay userMateriaId, obtener el materiaId correspondiente
+    // Si es extracurricular, no necesitamos userMateriaId
     let materiaIdToUse = materiaId;
-    if (userMateriaId) {
-      console.log('Buscando materia a partir de userMateriaId:', userMateriaId);
-      const userMateria = await this.prisma.userMateria.findUnique({
-        where: { id: userMateriaId },
-        select: { materiaId: true }
-      });
-      
-      if (!userMateria) {
-        throw new BadRequestException('No se encontró la relación usuario-materia especificada');
+    if (!esExtraescolar) {
+      // Solo verificar userMateria si no es extracurricular
+      if (userMateriaId) {
+        console.log('Buscando materia a partir de userMateriaId:', userMateriaId);
+        const userMateria = await this.prisma.userMateria.findUnique({
+          where: { id: userMateriaId },
+          select: { materiaId: true }
+        });
+        
+        if (!userMateria) {
+          throw new BadRequestException('No se encontró la relación usuario-materia especificada');
+        }
+        
+        materiaIdToUse = userMateria.materiaId;
+        console.log('Materia encontrada a partir de userMateriaId:', materiaIdToUse);
+      } else if (!materiaId) {
+        // Si no es extracurricular y no hay materiaId, es un error
+        throw new BadRequestException('Se requiere un ID de materia o un ID de relación usuario-materia para materias regulares');
       }
-      
-      materiaIdToUse = userMateria.materiaId;
-      console.log('Materia encontrada a partir de userMateriaId:', materiaIdToUse);
     }
 
     // Verificar si el estudiante existe
@@ -134,9 +140,7 @@ export class CalificacionesService {
     }
 
     // Si llegamos aquí y no tenemos un ID de materia, verificar si es necesario
-    if (!materiaIdToUse && !esExtraescolar) {
-      throw new BadRequestException('Se requiere un ID de materia o un ID de relación usuario-materia para materias regulares');
-    }
+    // (esta validación ya se maneja en el bloque anterior)
     
     if (esExtraescolar) {
       // Si es extracurricular, verificar que tenemos el nombre de la materia
@@ -183,13 +187,14 @@ export class CalificacionesService {
           });
           
           // Si la materia existe pero no tiene tipo o no es extracurricular, actualizarla
-          if (!materiaExistente.tipoMateriaId || materiaExistente.tipoMateriaId !== tipoExtracurricular.id) {
+          if (!materiaExistente.tipoMateriaId || materiaExistente.tipoMateriaId !== tipoExtracurricular.id || !materiaExistente.esExtracurricular) {
             console.log('Actualizando tipo de materia a extracurricular...');
             await this.prisma.materia.update({
               where: { id: materiaExistente.id },
               data: { 
                 tipoMateriaId: tipoExtracurricular.id,
-                activa: true 
+                activa: true,
+                esExtracurricular: true
               }
             });
           }
@@ -208,7 +213,8 @@ export class CalificacionesService {
               creditos: 0,
               descripcion: `Materia extracurricular: ${nombreMateria || ''}`,
               tipoMateriaId: tipoExtracurricular.id,
-              activa: true
+              activa: true,
+              esExtracurricular: true
             },
             select: { id: true, nombre: true, codigo: true }
           });

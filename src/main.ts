@@ -10,7 +10,7 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   
   // Enable CORS with proper headers
-  const frontendUrl = configService.get('http://localhost:3000', 'https://notas-frontend-ten.vercel.app');
+  const frontendUrl = configService.get('FRONTEND_URL', 'http://localhost:3000');
   app.enableCors({
     origin: frontendUrl,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',

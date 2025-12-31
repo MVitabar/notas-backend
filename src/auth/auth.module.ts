@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -7,12 +7,14 @@ import { JwtStrategy } from './jwt.strategy';
 import { AuthController } from './auth.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { MateriasModule } from '../materias/materias.module';
+import { CalificacionesModule } from '../calificaciones/calificaciones.module';
 
 @Module({
   imports: [
     ConfigModule,
     PrismaModule,
-    MateriasModule,
+    forwardRef(() => MateriasModule),
+    forwardRef(() => CalificacionesModule),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

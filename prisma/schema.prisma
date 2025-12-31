@@ -8,25 +8,26 @@ datasource db {
 }
 
 model User {
-  id                     String          @id @default(uuid())
-  email                  String          @unique
-  password               String
-  nombre                 String
-  activo                 Boolean         @default(true)
-  createdAt              DateTime        @default(now())
-  updatedAt              DateTime        @updatedAt
-  apellido               String?
-  direccion              String?
-  fechaNacimiento        DateTime?
-  telefono               String?
-  contactoEmergencia     String?
-  dni                    String?
-  requiresPasswordChange Boolean         @default(true)
-  telefonoEmergencia     String?
-  rol                    UserRole        @default(USUARIO)
-  calificaciones         Calificacion[]
-  perfilDocente          TeacherProfile?
-  materias               UserMateria[]
+  id                         String                  @id @default(uuid())
+  email                      String                  @unique
+  password                   String
+  nombre                     String
+  activo                     Boolean                 @default(true)
+  createdAt                  DateTime                @default(now())
+  updatedAt                  DateTime                @updatedAt
+  apellido                   String?
+  direccion                  String?
+  fechaNacimiento            DateTime?
+  telefono                   String?
+  contactoEmergencia         String?
+  dni                        String?
+  requiresPasswordChange     Boolean                 @default(true)
+  telefonoEmergencia         String?
+  rol                        UserRole                @default(USUARIO)
+  calificaciones             Calificacion[]
+  calificacionesHabitoDocente CalificacionHabito[]    @relation("DocenteCalificaciones")
+  perfilDocente              TeacherProfile?
+  materias                   UserMateria[]
 }
 
 model TeacherProfile {
@@ -42,18 +43,24 @@ model TeacherProfile {
 }
 
 model Materia {
-  id             String         @id @default(uuid())
-  nombre         String         @unique
-  descripcion    String?
-  codigo         String         @unique
-  creditos       Int
-  activa         Boolean        @default(true)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  tipoMateriaId  String?
-  calificaciones Calificacion[]
-  tipoMateria    TipoMateria?   @relation(fields: [tipoMateriaId], references: [id])
-  docentes       UserMateria[]
+  id                 String         @id @default(uuid())
+  nombre             String         @unique
+  descripcion        String?
+  codigo             String         @unique
+  creditos           Int
+  activa             Boolean        @default(true)
+  esExtracurricular  Boolean        @default(false)
+  orden              Int?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  tipoMateriaId      String?
+  calificaciones     Calificacion[]
+  tipoMateria        TipoMateria?   @relation(fields: [tipoMateriaId], references: [id])
+  docentes           UserMateria[]
+  evaluacionesHabito EvaluacionHabito[]
+
+  @@index([esExtracurricular])
+  @@index([orden])
 }
 
 model TipoMateria {
@@ -66,17 +73,18 @@ model TipoMateria {
 }
 
 model PeriodoAcademico {
-  id             String         @id @default(uuid())
-  name           String         @unique
-  startDate      DateTime
-  endDate        DateTime
-  isCurrent      Boolean        @default(false)
-  description    String?
-  status         String         @default("upcoming")
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  calificaciones Calificacion[]
-  userMaterias   UserMateria[]
+  id                     String               @id @default(uuid())
+  name                   String               @unique
+  startDate              DateTime
+  endDate                DateTime
+  isCurrent              Boolean              @default(false)
+  description            String?
+  status                 String               @default("upcoming")
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  calificaciones         Calificacion[]
+  calificacionesHabito   CalificacionHabito[]
+  userMaterias           UserMateria[]
 
   @@index([isCurrent])
   @@index([status])
@@ -101,22 +109,23 @@ model UserMateria {
 }
 
 model Student {
-  id                 String         @id @default(uuid())
-  nombre             String
-  apellido           String
-  fechaNacimiento    DateTime
-  dni                String         @unique
-  direccion          String?
-  telefono           String?
-  contactoEmergencia String?
-  telefonoEmergencia String?
-  email              String?        @unique
-  activo             Boolean        @default(true)
-  materias           String[]       @default([])
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
-  grados             String[]       @default([])
-  calificaciones     Calificacion[]
+  id                     String               @id @default(uuid())
+  nombre                 String
+  apellido               String
+  fechaNacimiento        DateTime
+  dni                    String               @unique
+  direccion              String?
+  telefono               String?
+  contactoEmergencia     String?
+  telefonoEmergencia     String?
+  email                  String?              @unique
+  activo                 Boolean              @default(true)
+  materias               String[]             @default([])
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  grados                 String[]             @default([])
+  calificaciones         Calificacion[]
+  calificacionesHabito   CalificacionHabito[]
 }
 
 model Calificacion {
@@ -133,14 +142,60 @@ model Calificacion {
   updatedAt        DateTime         @updatedAt
   tipoCalificacion TipoCalificacion
   valorConceptual  ValorConceptual?
+  unidad           String?          // 'u1', 'u2', 'u3', 'u4'
   docente          User             @relation(fields: [docenteId], references: [id], onDelete: Cascade)
   estudiante       Student          @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
   materia          Materia          @relation(fields: [materiaId], references: [id], onDelete: Cascade)
   periodo          PeriodoAcademico @relation(fields: [periodoId], references: [id], onDelete: Cascade)
 
-  @@unique([estudianteId, materiaId, periodoId, tipoEvaluacion])
+  @@unique([estudianteId, materiaId, periodoId, tipoEvaluacion, unidad])
   @@index([estudianteId])
   @@index([materiaId])
+  @@index([periodoId])
+  @@index([docenteId])
+  @@index([unidad])
+}
+
+model EvaluacionHabito {
+  id               String              @id @default(uuid())
+  nombre           String
+  descripcion      String?
+  tipo             String              // 'habito_casa', 'responsabilidad_aprendizaje', 'comportamiento'
+  orden            Int
+  activo           Boolean             @default(true)
+  materiaId        String?
+  materia          Materia?            @relation(fields: [materiaId], references: [id], onDelete: SetNull)
+  calificaciones   CalificacionHabito[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@unique([nombre, tipo])
+  @@index([tipo])
+  @@index([orden])
+  @@index([materiaId])
+}
+
+model CalificacionHabito {
+  id                 String           @id @default(uuid())
+  estudianteId       String
+  evaluacionHabitoId String
+  periodoId          String
+  docenteId          String
+  u1                 String?          // Valor para la unidad 1
+  u2                 String?          // Valor para la unidad 2
+  u3                 String?          // Valor para la unidad 3
+  u4                 String?          // Valor para la unidad 4
+  comentario         String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  estudiante         Student          @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  evaluacionHabito   EvaluacionHabito @relation(fields: [evaluacionHabitoId], references: [id], onDelete: Cascade)
+  periodo            PeriodoAcademico @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  docente            User             @relation("DocenteCalificaciones", fields: [docenteId], references: [id], onDelete: Cascade)
+
+  @@unique([estudianteId, evaluacionHabitoId, periodoId])
+  @@index([estudianteId])
+  @@index([evaluacionHabitoId])
   @@index([periodoId])
   @@index([docenteId])
 }
@@ -148,6 +203,8 @@ model Calificacion {
 enum TipoCalificacion {
   NUMERICA
   CONCEPTUAL
+  HABITO
+  RESPONSABILIDAD
 }
 
 enum ValorConceptual {
