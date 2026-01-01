@@ -689,4 +689,357 @@ export class AuthService {
       throw new InternalServerErrorException('Error al obtener la lista de docentes');
     }
   }
+
+  async findTeacherById(id: string) {
+    try {
+      const teacher = await this.prisma.user.findUnique({
+        where: { 
+          id,
+          rol: UserRole.DOCENTE 
+        },
+        include: {
+          perfilDocente: true,
+          materias: {
+            include: {
+              materia: true
+            }
+          }
+        }
+      });
+
+      if (!teacher) {
+        throw new NotFoundException('Docente no encontrado');
+      }
+
+      // Format the response
+      return {
+        ...teacher,
+        materias: teacher.materias.map(um => ({
+          id: um.id,
+          materiaId: um.materiaId,
+          materia: um.materia,
+          seccion: um.seccion,
+          horario: um.horario,
+          periodo: um.periodo,
+          estado: um.estado,
+          periodoAcademicoId: um.periodoAcademicoId
+        }))
+      };
+    } catch (error) {
+      this.logger.error(`Error al buscar docente: ${error.message}`, error.stack);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Error al obtener los datos del docente');
+    }
+  }
+
+  async updateTeacherStatus(teacherId: string, status: boolean): Promise<{ success: boolean; message: string }> {
+    try {
+      // Check if teacher exists
+      const teacher = await this.prisma.user.findUnique({
+        where: { id: teacherId, rol: 'DOCENTE' },
+      });
+
+      if (!teacher) {
+        throw new NotFoundException('Docente no encontrado');
+      }
+
+      // Update teacher status
+      await this.prisma.user.update({
+        where: { id: teacherId },
+        data: { activo: status },
+      });
+
+      return {
+        success: true,
+        message: `Estado del docente actualizado correctamente a ${status ? 'activo' : 'inactivo'}`,
+      };
+    } catch (error) {
+      this.logger.error(`Error al actualizar el estado del docente: ${error.message}`, error.stack);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Error al actualizar el estado del docente');
+    }
+  }
+
+  async updateTeacher(teacherId: string, updateData: any): Promise<{ success: boolean; message: string; data?: any }> {
+    try {
+      // Check if teacher exists
+      const teacher = await this.prisma.user.findUnique({
+        where: { id: teacherId, rol: 'DOCENTE' },
+        include: {
+          perfilDocente: true,
+          materias: {
+            include: {
+              materia: true
+            }
+          }
+        }
+      });
+
+      if (!teacher) {
+        throw new NotFoundException('Docente no encontrado');
+      }
+
+      // Prepare update data
+      const { materias, perfilDocente, grados, ...userData } = updateData;
+      
+      // Clean user data - handle empty strings and format dates
+      const cleanedUserData = { ...userData };
+      
+      // Handle date fields
+      if (cleanedUserData.fechaNacimiento === '') {
+        cleanedUserData.fechaNacimiento = null;
+      } else if (cleanedUserData.fechaNacimiento) {
+        cleanedUserData.fechaNacimiento = new Date(cleanedUserData.fechaNacimiento);
+      }
+      
+      // Handle empty strings for optional fields
+      const optionalFields = ['telefono', 'direccion', 'contactoEmergencia', 'telefonoEmergencia', 'dni'];
+      optionalFields.forEach(field => {
+        if (cleanedUserData[field] === '') {
+          cleanedUserData[field] = null;
+        }
+      });
+      
+      // Prepare teacher profile data
+      const teacherProfileData = {
+        ...perfilDocente,
+        ...(grados !== undefined && { grados }) // Include grados if provided
+      };
+      
+      // Execute updates in a transaction
+      const [updatedUser] = await this.prisma.$transaction([
+        // 1. Update user data
+        this.prisma.user.update({
+          where: { id: teacherId },
+          data: cleanedUserData,
+          include: {
+            perfilDocente: true,
+            materias: {
+              include: {
+                materia: true
+              }
+            }
+          }
+        }),
+        
+        // 2. Update or create teacher profile if there's profile data or grados
+        ...(perfilDocente || grados ? [this.prisma.teacherProfile.upsert({
+          where: { userId: teacherId },
+          update: teacherProfileData,
+          create: {
+            ...teacherProfileData,
+            user: {
+              connect: { id: teacherId }
+            }
+          }
+        })] : [])
+      ]);
+      
+      this.logger.debug('Successfully updated teacher and profile data');
+
+      // Only update subjects if materias is explicitly provided in the update data
+      if (materias !== undefined && Array.isArray(materias)) {
+        this.logger.debug(`Processing ${materias.length} materias for update`);
+        
+        this.logger.debug(`Processing materias: ${JSON.stringify(materias)}`);
+        
+        if (Array.isArray(materias)) {
+          // First, remove all existing subject associations for this teacher
+          await this.prisma.userMateria.deleteMany({
+            where: { docenteId: teacherId }
+          });
+
+          // Get current period ID (you might want to make this dynamic)
+          const currentPeriod = await this.prisma.periodoAcademico.findFirst({
+            where: { isCurrent: true },
+            select: { id: true, name: true }
+          });
+
+          // Then add the new ones if there are any
+          if (materias.length > 0) {
+            this.logger.debug(`Creating ${materias.length} new materia associations`);
+            
+            // Process each materia (could be name or ID)
+            for (const materia of materias) {
+              try {
+                let materiaId: string | undefined;
+                let materiaName: string | undefined;
+
+                // Determine if we have an ID or a name
+                if (typeof materia === 'object' && materia !== null) {
+                  // It's an object, could have an ID or nombre
+                  if (materia.id) {
+                    materiaId = materia.id;
+                    materiaName = 'nombre' in materia ? materia.nombre : undefined;
+                  } else if ('nombre' in materia) {
+                    materiaName = materia.nombre;
+                  }
+                } else if (typeof materia === 'string') {
+                  // It's a string - could be ID or name
+                  if (materia.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)) {
+                    // It's a UUID, treat as ID
+                    materiaId = materia;
+                  } else {
+                    // It's a name, we'll need to find or create the materia
+                    materiaName = materia;
+                  }
+                }
+
+                if (!materiaId && !materiaName) {
+                  this.logger.warn(`Skipping invalid materia entry - must provide either ID or name: ${JSON.stringify(materia)}`);
+                  continue;
+                }
+
+                // If we have a name but no ID, find or create the materia
+                if (materiaName) {
+                  this.logger.debug(`Looking up or creating materia with name: ${materiaName}`);
+                  
+                  // Try to find existing materia by name
+                  const existingMateria = await this.prisma.materia.findFirst({
+                    where: { 
+                      nombre: { 
+                        equals: materiaName,
+                        mode: 'insensitive' // Case-insensitive search
+                      } 
+                    },
+                    select: { id: true }
+                  });
+
+                  if (existingMateria) {
+                    materiaId = existingMateria.id;
+                    this.logger.debug(`Found existing materia with ID: ${materiaId}`);
+                  } else {
+                    // Create new materia if it doesn't exist
+                    try {
+                      const newMateria = await this.prisma.materia.create({
+                        data: {
+                          nombre: materiaName,
+                          codigo: `MAT-${materiaName.substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`,
+                          descripcion: `Materia de ${materiaName}`,
+                          creditos: 1,
+                          activa: true
+                        }
+                      });
+                      materiaId = newMateria.id;
+                      this.logger.debug(`Created new materia with ID: ${materiaId}`);
+                    } catch (createError) {
+                      this.logger.error(`Error creating materia ${materiaName}:`, createError);
+                      continue; // Skip this materia if we can't create it
+                    }
+                  }
+                }
+
+                // At this point, we should have a valid materiaId
+                if (!materiaId) {
+                  this.logger.warn(`Could not determine materia ID for: ${JSON.stringify(materia)}`);
+                  continue;
+                }
+                
+                // Verify the materia exists (in case we were given an ID)
+                const materiaExists = await this.prisma.materia.findUnique({
+                  where: { id: materiaId },
+                  select: { id: true }
+                });
+
+                if (!materiaExists) {
+                  this.logger.warn(`Materia with ID ${materiaId} does not exist, skipping`);
+                  continue;
+                }
+                
+                this.logger.debug(`Creating UserMateria record for materiaId: ${materiaId}`);
+                
+                const userMateriaData = {
+                  docenteId: teacherId,
+                  materiaId: materiaId,
+                  seccion: 'A', // Default section
+                  horario: 'Por definir', // Default schedule
+                  periodo: currentPeriod?.name || '2025', // Use current period name or default
+                  periodoAcademicoId: currentPeriod?.id || 'default-period-id',
+                  estado: 'activo' as const
+                };
+                
+                this.logger.debug(`UserMateria data: ${JSON.stringify(userMateriaData)}`);
+                
+                await this.prisma.userMateria.create({
+                  data: userMateriaData
+                });
+                
+                this.logger.debug(`Successfully created UserMateria record for materiaId: ${materiaId}`);
+              } catch (error) {
+                this.logger.error(`Error processing materia ${JSON.stringify(materia)}: ${error.message}`, error.stack);
+                this.logger.error(`Error details: ${JSON.stringify({
+                  code: error.code,
+                  meta: error.meta,
+                  stack: error.stack
+                })}`);
+                // Continue with other materias even if one fails
+              }
+            }
+          } else {
+            this.logger.debug('No materias to associate (empty array provided)');
+          }
+        } else {
+          this.logger.warn(`Invalid materias format provided: ${JSON.stringify(materias)}`);
+          throw new BadRequestException('El formato de materias no es válido. Se espera un arreglo.');
+        }
+      }
+
+      // Get the updated teacher with all relations
+      this.logger.debug('Fetching updated teacher data...');
+      const updatedTeacher = await this.prisma.user.findUnique({
+        where: { id: teacherId },
+        include: {
+          perfilDocente: true,
+          materias: {
+            include: {
+              materia: true
+            }
+          }
+        }
+      });
+      
+      this.logger.debug(`Updated teacher data: ${JSON.stringify({
+        id: updatedTeacher?.id,
+        materiasCount: updatedTeacher?.materias?.length || 0
+      })}`);
+
+      // Format the response to include materias with their related data
+      const formattedTeacher = updatedTeacher ? {
+        ...updatedTeacher,
+        materias: updatedTeacher.materias?.map(um => ({
+          id: um.id,
+          materiaId: um.materiaId,
+          materia: um.materia,
+          seccion: um.seccion,
+          horario: um.horario,
+          periodo: um.periodo,
+          estado: um.estado,
+          periodoAcademicoId: um.periodoAcademicoId
+        })) || []
+      } : null;
+
+      if (!updatedTeacher) {
+        throw new NotFoundException('No se pudo recuperar los datos actualizados del docente');
+      }
+
+      return {
+        success: true,
+        message: 'Docente actualizado correctamente',
+        data: formattedTeacher
+      };
+    } catch (error) {
+      this.logger.error(`Error al actualizar el docente: ${error.message}`, error.stack);
+      if (error instanceof NotFoundException || error.code === 'P2025') {
+        throw new NotFoundException('Docente no encontrado');
+      }
+      if (error.code === 'P2002') {
+        throw new ConflictException('El correo electrónico ya está en uso');
+      }
+      throw new InternalServerErrorException('Error al actualizar el docente');
+    }
+  }
 }

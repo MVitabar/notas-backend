@@ -109,6 +109,7 @@ export class StudentsService {
       dni: string | null;
       activo: boolean;
       secciones: string[];
+      fechaNacimiento?: string | null;
     }>
   > {
     // Primero obtenemos todos los estudiantes que coincidan con el grado
@@ -215,6 +216,7 @@ export class StudentsService {
         dni: estudiante.dni || null,
         activo: estudiante.activo !== undefined ? estudiante.activo : true,
         secciones: seccionesEstudiante,
+        fechaNacimiento: estudiante.fechaNacimiento?.toISOString().split('T')[0] || null,
       };
     });
   }
@@ -282,6 +284,16 @@ export class StudentsService {
   ): Promise<Student> {
     try {
       const updateData: any = { ...updateStudentDto };
+
+      // Handle email - if it's empty string or null, remove it from update data
+      if (updateData.email === '' || updateData.email === null) {
+        delete updateData.email;
+      }
+      
+      // Also handle the Spanish alias for email
+      if (updateData.correoElectronico === '' || updateData.correoElectronico === null) {
+        delete updateData.correoElectronico;
+      }
 
       if (updateStudentDto.fechaNacimiento) {
         updateData.fechaNacimiento = new Date(updateStudentDto.fechaNacimiento);

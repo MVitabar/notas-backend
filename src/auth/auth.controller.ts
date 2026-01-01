@@ -12,7 +12,11 @@ import {
   ConflictException,
   HttpCode,
   InternalServerErrorException,
-  Logger
+  Logger,
+  Patch,
+  Param,
+  NotFoundException,
+  Put
 } from '@nestjs/common';
 import type { AuthRequest } from './interfaces/auth-request.interface';
 import { Public } from './decorators/public.decorator';
@@ -180,6 +184,70 @@ export class AuthController {
     } catch (error) {
       console.error('Error al obtener la lista de docentes:', error);
       throw new InternalServerErrorException('Error al obtener la lista de docentes');
+    }
+  }
+
+  @Get('teachers/:id')
+  @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.ADMIN)
+  async getTeacherById(@Param('id') id: string) {
+    try {
+      const teacher = await this.authService.findTeacherById(id);
+      return {
+        success: true,
+        data: teacher
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`Error al obtener el docente: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Error al obtener los datos del docente');
+    }
+  }
+
+  @Put('teachers/:id')
+  @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.ADMIN)
+  async updateTeacher(
+    @Param('id') teacherId: string,
+    @Body() updateData: any
+  ) {
+    try {
+      const result = await this.authService.updateTeacher(teacherId, updateData);
+      return {
+        success: true,
+        message: result.message,
+        data: result.data
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ConflictException) {
+        throw error;
+      }
+      this.logger.error(`Error al actualizar el docente: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Error al actualizar el docente');
+    }
+  }
+
+  @Patch('teachers/:id/status')
+  @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.ADMIN)
+  async updateTeacherStatus(
+    @Param('id') teacherId: string,
+    @Body() body: { status: boolean }
+  ) {
+    try {
+      const result = await this.authService.updateTeacherStatus(teacherId, body.status);
+      return {
+        success: true,
+        message: result.message
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`Error al actualizar el estado del docente: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Error al actualizar el estado del docente');
     }
   }
 }
