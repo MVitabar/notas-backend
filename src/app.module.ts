@@ -9,6 +9,7 @@ import { PasswordChangeGuard } from './auth/guards/password-change.guard';
 import { StudentsModule } from './students/students.module';
 import { AcademicPeriodModule } from './academic-period/academic-period.module';
 import { CalificacionesModule } from './calificaciones/calificaciones.module';
+import { PdfModule } from './pdf/pdf.module';
 
 @Module({
   imports: [
@@ -16,7 +17,8 @@ import { CalificacionesModule } from './calificaciones/calificaciones.module';
     PrismaModule,
     StudentsModule,
     AcademicPeriodModule,
-    CalificacionesModule
+    CalificacionesModule,
+    PdfModule
   ],
   controllers: [AppController],
   providers: [

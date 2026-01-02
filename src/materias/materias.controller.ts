@@ -30,6 +30,12 @@ export class MateriasController {
     return this.materiasService.findAll();
   }
 
+  @Get('tipos')
+  @Roles(UserRole.ADMIN, UserRole.DOCENTE, UserRole.ESTUDIANTE)
+  findAllTiposMateria() {
+    return this.materiasService.findAllTiposMateria();
+  }
+
   @Get('docente/mis-materias')
   @Roles(UserRole.DOCENTE)
   getMisMaterias(@Req() req) {

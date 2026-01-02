@@ -21,6 +21,7 @@ export interface HabitoEstudiante {
   comentario: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
+  calificaciones?: any[]; // Array de calificaciones históricas
   esMateria: boolean;
 }
 

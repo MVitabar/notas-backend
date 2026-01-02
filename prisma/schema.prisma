@@ -156,11 +156,18 @@ model Calificacion {
   @@index([unidad])
 }
 
+enum EvaluacionTipo {
+  EXTRACURRICULAR
+  COMPORTAMIENTO
+  APRENDIZAJE
+  CASA
+}
+
 model EvaluacionHabito {
   id               String              @id @default(uuid())
   nombre           String
   descripcion      String?
-  tipo             String              // 'habito_casa', 'responsabilidad_aprendizaje', 'comportamiento'
+  tipo             EvaluacionTipo      @default(APRENDIZAJE)
   orden            Int
   activo           Boolean             @default(true)
   materiaId        String?

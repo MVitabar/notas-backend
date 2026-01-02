@@ -13,11 +13,34 @@ async function bootstrap() {
   const frontendUrl = configService.get('FRONTEND_URL', 'http://localhost:3000');
   app.enableCors({
     origin: frontendUrl,
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma'],
+    exposedHeaders: ['Content-Disposition'],
     credentials: true,
     preflightContinue: false,
     optionsSuccessStatus: 204,
+    maxAge: 86400, // 24 hours
+  });
+
+  // Handle OPTIONS method for preflight requests
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', frontendUrl);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    next();
+  });
+
+  // Add request logging middleware
+  app.use((req, res, next) => {
+    const { method, originalUrl, headers } = req;
+    logger.debug(`[${new Date().toISOString()}] ${method} ${originalUrl}`);
+    logger.debug(`Headers: ${JSON.stringify(headers, null, 2)}`);
+    next();
   });
 
   // Enable global validation

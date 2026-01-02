@@ -87,6 +87,51 @@ export class CalificacionHabitoController {
     }
   }
 
+  @Put('estudiante/:estudianteId')
+  @Roles(UserRole.DOCENTE, UserRole.ADMIN)
+  async updateCalificacionesPorEstudiante(
+    @Param('estudianteId') estudianteId: string,
+    @Body() data: { 
+      periodoId: string;
+      calificaciones: Array<{
+        evaluacionHabitoId: string;
+        u1?: string | null;
+        u2?: string | null;
+        u3?: string | null;
+        u4?: string | null;
+        comentario?: string | null;
+      }>;
+    },
+    @Req() req: any
+  ) {
+    if (!data.periodoId) {
+      throw new BadRequestException('El parámetro periodoId es requerido');
+    }
+
+    try {
+      // Obtener el ID del docente desde el token JWT
+      const docenteId = req.user.userId;
+      
+      if (!docenteId) {
+        throw new BadRequestException('No se pudo identificar al docente');
+      }
+
+      await this.calificacionHabitoService.actualizarCalificaciones(
+        estudianteId,
+        data.periodoId,
+        data.calificaciones,
+        docenteId
+      );
+      
+      return { success: true, message: 'Calificaciones actualizadas correctamente' };
+    } catch (error) {
+      console.error('Error al actualizar calificaciones de hábitos:', error);
+      throw new BadRequestException(
+        error.message || 'Error al actualizar las calificaciones de hábitos'
+      );
+    }
+  }
+
   @Post()
   @Roles(UserRole.DOCENTE, UserRole.ADMIN)
   async create(

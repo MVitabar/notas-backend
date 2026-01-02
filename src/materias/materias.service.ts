@@ -37,6 +37,12 @@ export class MateriasService {
     });
   }
 
+  async findAllTiposMateria() {
+    return this.prisma.tipoMateria.findMany({
+      orderBy: { nombre: 'asc' }
+    });
+  }
+
   async findOne(id: string) {
     const materia = await this.prisma.materia.findUnique({
       where: { id },
