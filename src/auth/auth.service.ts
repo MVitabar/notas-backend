@@ -359,20 +359,20 @@ export class AuthService {
             where: { isCurrent: true }
           });
 
-          // If no current period exists, create a default one
+          // If no current period exists, skip creating relationships
           if (!currentPeriod) {
-            this.logger.log('No active academic period found. Creating a default period...');
-            currentPeriod = await this.prisma.periodoAcademico.create({
-              data: { 
-                name: 'Período Inicial',
-                startDate: new Date(),
-                endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
-                isCurrent: true,
-                description: 'Período creado automáticamente para asignaciones iniciales',
-                status: 'active'
-              }
-            });
-            this.logger.log(`Created default academic period: ${currentPeriod.name} (ID: ${currentPeriod.id})`);
+            this.logger.log('No active academic period found. Skipping subject relationships creation.');
+            // Transform the response before returning
+            const { password, ...result } = newUser;
+            const perfilDocente = result.perfilDocente ? {
+              ...result.perfilDocente,
+              materias: [],
+              status: (result.perfilDocente.status === 'inactive' ? 'inactive' : 'active') as 'active' | 'inactive',
+            } : null;
+            return {
+              ...result,
+              perfilDocente,
+            } as UserWithoutPassword;
           }
 
           // Create subject relationships with the period
