@@ -82,12 +82,14 @@ model PeriodoAcademico {
   status                 String               @default("upcoming")
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
+  unidadAsignada         String?              // 'u1', 'u2', 'u3', 'u4'
   calificaciones         Calificacion[]
   calificacionesHabito   CalificacionHabito[]
   userMaterias           UserMateria[]
 
   @@index([isCurrent])
   @@index([status])
+  @@index([unidadAsignada])
 }
 
 model UserMateria {

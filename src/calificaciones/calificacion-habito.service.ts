@@ -2,10 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaExtendedService } from '../prisma/prisma-extended.service';
 import { EvaluacionHabito, CalificacionHabito, Prisma } from '@prisma/client';
 import { GrupoHabito, HabitoEstudiante, ResumenHabitos } from './types/habitos.types';
+import { PeriodoUnidadService } from '../academic-period/periodo-unidad.service';
 
 @Injectable()
 export class CalificacionHabitoService {
-  constructor(private prisma: PrismaExtendedService) {}
+  constructor(
+    private prisma: PrismaExtendedService,
+    private periodoUnidadService: PeriodoUnidadService
+  ) {}
 
   async actualizarCalificaciones(
     estudianteId: string,
@@ -785,5 +789,94 @@ export class CalificacionHabitoService {
     }
 
     return resumen;
+  }
+
+  // Nuevo método para obtener calificaciones con unidad dinámica
+  async obtenerCalificacionesConUnidadDinamica(
+    estudianteId: string,
+    periodoId: string
+  ): Promise<{
+    resumen: ResumenHabitos;
+    unidadActual: string;
+    nombreUnidad: string;
+  }> {
+    // Obtener la unidad asignada para este período
+    const unidadActual = await this.periodoUnidadService.getUnidadPorPeriodo(periodoId);
+    
+    // Obtener información del período para mostrar nombre
+    const periodo = await this.prisma.periodoAcademico.findUnique({
+      where: { id: periodoId },
+      select: { name: true }
+    });
+
+    // Mapear unidad a nombre descriptivo
+    const nombreUnidad = this.getNombreUnidad(unidadActual);
+
+    // Obtener las calificaciones existentes
+    const resumen = await this.obtenerResumenHabitos(estudianteId, periodoId);
+
+    return {
+      resumen,
+      unidadActual,
+      nombreUnidad: `${nombreUnidad} - ${periodo?.name || 'Período'}`
+    };
+  }
+
+  private getNombreUnidad(unidad: string): string {
+    const nombres = {
+      'u1': 'Primera Unidad',
+      'u2': 'Segunda Unidad', 
+      'u3': 'Tercera Unidad',
+      'u4': 'Cuarta Unidad'
+    };
+    return nombres[unidad as keyof typeof nombres] || unidad;
+  }
+
+  // Método para actualizar calificaciones usando unidad dinámica
+  async actualizarCalificacionPorUnidad(
+    estudianteId: string,
+    periodoId: string,
+    evaluacionHabitoId: string,
+    valor: string,
+    comentario?: string
+  ) {
+    // Obtener la unidad correspondiente al período
+    const unidad = await this.periodoUnidadService.getUnidadPorPeriodo(periodoId);
+    
+    // Construir el objeto de actualización dinámicamente
+    const updateData: any = {
+      comentario: comentario || null
+    };
+    
+    // Asignar el valor a la unidad correspondiente
+    updateData[unidad] = valor;
+
+    // Buscar si ya existe una calificación para esta combinación
+    const calificacionExistente = await this.prisma.calificacionHabito.findFirst({
+      where: {
+        estudianteId,
+        periodoId,
+        evaluacionHabitoId
+      }
+    });
+
+    if (calificacionExistente) {
+      // Actualizar existente
+      return this.prisma.calificacionHabito.update({
+        where: { id: calificacionExistente.id },
+        data: updateData
+      });
+    } else {
+      // Crear nueva
+      return this.prisma.calificacionHabito.create({
+        data: {
+          estudianteId,
+          periodoId,
+          evaluacionHabitoId,
+          docenteId: '', // Debe venir del contexto del usuario autenticado
+          ...updateData
+        }
+      });
+    }
   }
 }

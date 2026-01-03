@@ -12,7 +12,7 @@ import { AuthModule } from '../auth/auth.module';
   imports: [
     PrismaModule,
     forwardRef(() => MateriasModule),
-    AcademicPeriodModule,
+    AcademicPeriodModule, // Esto exporta PeriodoUnidadService
     forwardRef(() => AuthModule)
   ],
   controllers: [

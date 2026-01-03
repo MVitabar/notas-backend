@@ -2,10 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAcademicPeriodDto } from './dto/create-academic-period.dto';
 import { UpdateAcademicPeriodDto } from './dto/update-academic-period.dto';
+import { PeriodoUnidadService } from './periodo-unidad.service';
 
 @Injectable()
 export class AcademicPeriodService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private periodoUnidadService: PeriodoUnidadService
+  ) {}
 
   async create(createAcademicPeriodDto: CreateAcademicPeriodDto) {
     if (createAcademicPeriodDto.isCurrent) {
@@ -15,11 +19,17 @@ export class AcademicPeriodService {
       });
     }
 
+    // Detectar y asignar unidad automáticamente
+    const unidadAsignada = await this.periodoUnidadService.detectarYAsignarUnidad(
+      createAcademicPeriodDto.name
+    );
+
     // Ensure dates are properly formatted as ISO-8601
     const data = {
       ...createAcademicPeriodDto,
       startDate: new Date(createAcademicPeriodDto.startDate).toISOString(),
       endDate: new Date(createAcademicPeriodDto.endDate).toISOString(),
+      unidadAsignada, // Nueva campo
     };
 
     return this.prisma.periodoAcademico.create({
