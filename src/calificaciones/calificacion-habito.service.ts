@@ -11,6 +11,33 @@ export class CalificacionHabitoService {
     private periodoUnidadService: PeriodoUnidadService
   ) {}
 
+  // Función auxiliar para obtener IDs de tipos de materia por nombre
+  private async obtenerTiposMateriaIds(): Promise<{ hogarId: string; habitoId: string }> {
+    const tiposMateria = await this.prisma.tipoMateria.findMany({
+      where: {
+        nombre: {
+          in: ['HOGAR', 'HABITO']
+        }
+      },
+      select: {
+        id: true,
+        nombre: true
+      }
+    });
+
+    const hogar = tiposMateria.find(t => t.nombre === 'HOGAR');
+    const habito = tiposMateria.find(t => t.nombre === 'HABITO');
+
+    if (!hogar || !habito) {
+      throw new Error('No se encontraron los tipos de materia HOGAR y HABITO necesarios');
+    }
+
+    return {
+      hogarId: hogar.id,
+      habitoId: habito.id
+    };
+  }
+
   async actualizarCalificaciones(
     estudianteId: string,
     periodoId: string,
@@ -451,6 +478,9 @@ export class CalificacionHabitoService {
 
   async obtenerCalificacionesPorEstudiante(estudianteId: string, periodoId: string) {
     try {
+      // Obtener los IDs de tipos de materia de forma dinámica
+      const { hogarId, habitoId } = await this.obtenerTiposMateriaIds();
+
       // Verificar si el estudiante existe
       const estudiante = await this.prisma.student.findUnique({
         where: { id: estudianteId }
@@ -553,8 +583,8 @@ export class CalificacionHabitoService {
         WHERE m."activa" = true
         AND (
           m."esExtracurricular" = true 
-          OR m."tipoMateriaId" = 'e133dce1-bb77-4b05-bdcb-0dc5d4c5df19' 
-          OR m."tipoMateriaId" = '16b47d65-2cb9-4c2e-8779-9e2f5576d896'
+          OR m."tipoMateriaId" = '${hogarId}' 
+          OR m."tipoMateriaId" = '${habitoId}'
         )
         AND (${gradosConditions})
         ORDER BY m."orden" ASC, m."nombre" ASC
@@ -631,10 +661,10 @@ export class CalificacionHabitoService {
         if (materia.esExtracurricular) {
           // Materias extracurriculares tradicionales
           tipoEvaluacion = 'EXTRACURRICULAR';
-        } else if (materia.tipoMateriaId === 'e133dce1-bb77-4b05-bdcb-0dc5d4c5df19') {
+        } else if (materia.tipoMateriaId === hogarId) {
           // HOGAR -> Hábitos en casa
           tipoEvaluacion = 'CASA';
-        } else if (materia.tipoMateriaId === '16b47d65-2cb9-4c2e-8779-9e2f5576d896') {
+        } else if (materia.tipoMateriaId === habitoId) {
           // HABITO -> Puede ser COMPORTAMIENTO o APRENDIZAJE según el nombre
           const comportamientos = [
             'Respeta autoridad', 'Interactúa bien con sus compañeros', 'Respeta los derechos y propiedades de otros',
