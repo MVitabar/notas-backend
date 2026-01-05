@@ -14,6 +14,8 @@ export interface HabitoEstudiante {
   nombre: string;
   descripcion: string | null;
   tipo: string;
+  tipoMateriaId?: string; // Agregar el ID del tipo de materia
+  grados?: string[]; // Grados asignados a la materia
   u1: string | null;
   u2: string | null;
   u3: string | null;

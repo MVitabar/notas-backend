@@ -8,85 +8,331 @@ const EvaluacionTipo = {
   CASA: 'CASA'
 } as const;
 
-// Definir las materias únicas (extraídas del seed original)
-const materiasUnicas = [
-  // Académicas
-  "Comprensión de Lectura",
-  "Lógica Matemática", 
-  "Programa de Lectura",
-  "Razonamiento Verbal",
-  "Razonamiento Matemático",
-  "Moral Cristiana",
-  
-  // Comportamiento
-  "Respeta autoridad",
-  "Interactúa bien con sus compañeros", 
-  "Acepta responsabilidad",
-  "Practica valores morales",
-  "Responsable en clases",
-  "Llega a tiempo",
-  
-  // Hábitos de casa
-  "Viene preparado",
-  "Termina tareas",
-  "Lee diariamente",
-  "Asiste a juntas",
-  "Atiende juntas de padres",
-  "Practica diariamente lo estudiado",
-  
-  // Aprendizaje
-  "Practica matemáticas",
-  "Practica vocabulario de inglés",
-  "Completa trabajo a tiempo",
-  "Completa trabajos a tiempo",
-  "Regresa tareas firmadas",
-  "Participa en actividades"
-];
+// Definir las materias organizadas por grados y tipos
+const materiasPorGrado = {
+  // Primero a tercero de primaria
+  'primaria-baja': {
+    academicas: [
+      "Idioma Materno",
+      "Tercer Idioma (Inglés)",
+      "Matemáticas",
+      "Medio Social",
+      "Medio Natural",
+      "Expresión Artística",
+      "Educación Física",
+      "Formación Ciudadana",
+      "Ortografía",
+      "Artes Plásticas",
+      "Moral Cristiana",
+      "Computación"
+    ],
+    extracurriculares: [
+      "Comprensión de Lectura",
+      "Lógica Matemática"
+    ],
+    comportamiento: [
+      "Respeta autoridad",
+      "Interactúa bien con sus compañeros",
+      "Respeta los derechos y propiedades de otros",
+      "Demuestra control de sí mismo",
+      "Acepta responsabilidad de sus acciones"
+    ],
+    casa: [
+      "Llega a tiempo",
+      "Viene preparado para aprender",
+      "Termina tareas",
+      "Lee diariamente en casa",
+      "Atiende junta de padres y maestros",
+      "Práctica matemáticas diariamente",
+      "Práctica vocabulario de inglés diariamente"
+    ],
+    aprendizaje: [
+      "Completa trabajo / asignatura, a tiempo",
+      "Regresa tareas terminadas y notas firmadas a tiempo",
+      "Participa e interactúa en actividades de aprendizaje",
+      "Práctica valores morales diariamente"
+    ]
+  },
 
-// Mapeo de materias a sus tipos
-export const materiaTipoMap: Record<string, string> = {
-  // Extracurriculares
-  'Comprensión de Lectura': EvaluacionTipo.EXTRACURRICULAR,
-  'Lógica Matemática': EvaluacionTipo.EXTRACURRICULAR,
-  
-  // Comportamiento
-  'Respeta autoridad': EvaluacionTipo.COMPORTAMIENTO,
-  'Interactúa bien con sus compañeros': EvaluacionTipo.COMPORTAMIENTO,
-  'Acepta responsabilidad': EvaluacionTipo.COMPORTAMIENTO,
-  'Practica valores morales': EvaluacionTipo.COMPORTAMIENTO,
-  'Responsable en clases': EvaluacionTipo.COMPORTAMIENTO,
-  'Llega a tiempo': EvaluacionTipo.COMPORTAMIENTO,
-  
-  // Hábitos de casa
-  'Viene preparado': EvaluacionTipo.CASA,
-  'Termina tareas': EvaluacionTipo.CASA,
-  'Lee diariamente': EvaluacionTipo.CASA,
-  'Asiste a juntas': EvaluacionTipo.CASA,
-  'Atiende juntas de padres': EvaluacionTipo.CASA,
-  'Practica diariamente lo estudiado': EvaluacionTipo.CASA,
-  
-  // Aprendizaje
-  'Practica matemáticas': EvaluacionTipo.APRENDIZAJE,
-  'Practica vocabulario de inglés': EvaluacionTipo.APRENDIZAJE,
-  'Completa trabajo a tiempo': EvaluacionTipo.APRENDIZAJE,
-  'Completa trabajos a tiempo': EvaluacionTipo.APRENDIZAJE,
-  'Regresa tareas firmadas': EvaluacionTipo.APRENDIZAJE,
-  'Participa en actividades': EvaluacionTipo.APRENDIZAJE,
-  'Programa de Lectura': EvaluacionTipo.APRENDIZAJE,
-  'Razonamiento Verbal': EvaluacionTipo.APRENDIZAJE,
-  'Razonamiento Matemático': EvaluacionTipo.APRENDIZAJE,
-  'Moral Cristiana': EvaluacionTipo.APRENDIZAJE,
+  // Cuarto a sexto de primaria
+  'primaria-alta': {
+    academicas: [
+      "Idioma Materno",
+      "Tercer Idioma (Inglés)",
+      "Matemáticas",
+      "Ciencias Sociales",
+      "Ciencias Naturales y Tecnología",
+      "Expresión Artística (Música)",
+      "Educación Física",
+      "Formación Ciudadana",
+      "Productividad y Desarrollo",
+      "Ortografía",
+      "Artes Plásticas",
+      "Moral Cristiana",
+      "Computación"
+    ],
+    extracurriculares: [
+      "Comprensión de Lectura",
+      "Lógica Matemática"
+    ],
+    comportamiento: [
+      "Respeta autoridad",
+      "Interactúa bien con sus compañeros",
+      "Respeta los derechos y propiedades de otros",
+      "Demuestra control de sí mismo",
+      "Acepta responsabilidad de sus acciones"
+    ],
+    casa: [
+      "Llega a tiempo",
+      "Viene preparado para aprender",
+      "Termina tareas",
+      "Lee diariamente en casa",
+      "Atiende junta de padres y maestros",
+      "Práctica matemáticas diariamente",
+      "Práctica vocabulario de inglés diariamente"
+    ],
+    aprendizaje: [
+      "Completa trabajo / asignatura, a tiempo",
+      "Regresa tareas terminadas y notas firmadas a tiempo",
+      "Participa e interactúa en actividades de aprendizaje",
+      "Práctica valores morales diariamente"
+    ]
+  },
+
+  // Primero a tercero básico
+  'basico': {
+    academicas: [
+      "Matemáticas",
+      "Culturas e Idiomas Mayas, Garífuna o Xinca",
+      "Comunicación y Lenguaje, Idioma Español",
+      "Comunicación y Lenguaje Idioma Extranjero",
+      "Ciencias Naturales",
+      "Ciencias Sociales, Formación Ciudadana e Interculturalidad",
+      "Educación Musical",
+      "Artes Visuales",
+      "Teatro",
+      "Danza",
+      "Emprendimiento para la productividad",
+      "Tecnologías del Aprendizaje y la Comunicación",
+      "Educación Física"
+    ],
+    extracurriculares: [
+      "Moral Cristiana",
+      "Programa de Lectura"
+    ],
+    comportamiento: [
+      "Respeta Autoridad",
+      "Interactúa bien con sus compañeros",
+      "Acepta Responsabilidad de sus acciones",
+      "Práctica Valores Morales diariamente",
+      "Responsable en Clase",
+      "Llega a tiempo",
+      "Atiende juntas de padres"
+    ],
+    casa: [],
+    aprendizaje: [
+      "Completa Trabajos a Tiempo",
+      "Participa en actividades de aprendizaje",
+      "Práctica diariamente lo estudiado"
+    ]
+  },
+
+  // Cuarto Perito Contador
+  'pc-cuarto': {
+    academicas: [
+      "CONTABILIDAD DE SOCIEDADES",
+      "MATEMÁTICA COMERCIAL",
+      "FUNDAMENTOS DE DERECHO",
+      "INGLÉS COMERCIAL",
+      "REDACCIÓN Y CORRESPONDENCIA MERCANTIL",
+      "INTRODUCCIÓN A LA ECONOMÍA",
+      "ORTOGRAFÍA Y CALIGRAFÍA",
+      "ADMINISTRACIÓN Y ORGANIZACIÓN DE OFICINA",
+      "COMPUTACIÓN",
+      "PROGRAMACIÓN",
+      "MATEMÁTICA BÁSICA",
+      "FÍSICA",
+      "MÉTODOS DE LA INVESTIGACIÓN"
+    ],
+    extracurriculares: [
+      "PROGRAMA DE LECTURA",
+      "MORAL CRISTIANA"
+    ],
+    comportamiento: [
+      "RESPETA AUTORIDAD",
+      "INTERACTÚA BIEN CON SUS COMPAÑEROS",
+      "ACEPTA RESPONSABILIDAD DE SUS ACCIONES",
+      "PRÁCTICA VALORES MORALES DIARIAMENTE",
+      "RESPONSABLE EN CLASES",
+      "LLEGA A TIEMPO",
+      "ATIENDE JUNTAS DE PADRES"
+    ],
+    casa: [],
+    aprendizaje: [
+      "COMPLETA TRABAJOS A TIEMPO",
+      "PARTICIPA EN ACTIVIDADES DE APRENDIZAJE",
+      "PRÁCTICA DIARIMAENTE LO ESTUDIADO"
+    ]
+  },
+
+  // Quinto Perito Contador
+  'pc-quinto': {
+    academicas: [
+      "CONTABILIDAD DE COSTOS",
+      "CÁLCULO MERCANTIL Y FINANCIERO",
+      "INGLÉS COMERCIAL",
+      "LEGISLACIÓN FISCAL Y ADUANA",
+      "FINANZAS PÚBLICAS",
+      "GEOGRAFÍA ECONÓMICA",
+      "CATALOGACIÓN Y ARCHIVO",
+      "MECANOGRAFÍA",
+      "COMPUTACIÓN",
+      "PROGRAMACIÓN",
+      "MATEMÁTICA BÁSICA",
+      "QUÍMICA GENERAL",
+      "GESTIÓN DE PROYECTOS"
+    ],
+    extracurriculares: [
+      "PROGRAMA DE LECTURA",
+      "MORAL CRISTIANA"
+    ],
+    comportamiento: [
+      "RESPETA AUTORIDAD",
+      "INTERACTÚA BIEN CON SUS COMPAÑEROS",
+      "ACEPTA RESPONSABILIDAD DE SUS ACCIONES",
+      "PRÁCTICA VALORES MORALES DIARIAMENTE",
+      "RESPONSABLE EN CLASES",
+      "LLEGA A TIEMPO",
+      "ATIENDE JUNTAS DE PADRES"
+    ],
+    casa: [],
+    aprendizaje: [
+      "COMPLETA TRABAJOS A TIEMPO",
+      "PARTICIPA EN ACTIVIDADES DE APRENDIZAJE",
+      "PRÁCTICA DIARIMAENTE LO ESTUDIADO"
+    ]
+  },
+
+  // Cuarto y quinto Bachillerato en Ciencias y Letras
+  'bcl': {
+    academicas: [
+      "LENGUA Y LITERATURA",
+      "COMUNICACIÓN Y LENGUAJE L3 (INGLÉS TÉCNICO)",
+      "TICS",
+      "MATEMÁTICAS",
+      "FÍSICA",
+      "CIENCIAS SOCIALES Y FORMACIÓN CIUDADANA",
+      "PSICOLOGÍA",
+      "EDUCACIÓN FÍSICA",
+      "ELABORACIÓN Y GESTIÓN DE PROYECTOS",
+      "FILOSOFÍA",
+      "METODOLOGÍA DE LA INVESTIGACIÓN",
+      "RAZONAMIENTO MATEMÁTICO"
+    ],
+    extracurriculares: [
+      "RAZONAMIENTO VERBAL",
+      "PROGRAMA DE LECTURA",
+      "MORAL CRISTIANA"
+    ],
+    comportamiento: [
+      "RESPETA AUTORIDAD",
+      "INTERACTÚA BIEN CON SUS COMPAÑEROS",
+      "ACEPTA RESPONSABILIDAD DE SUS ACCIONES",
+      "PRÁCTICA VALORES MORALES DIARIAMENTE",
+      "RESPONSABLE EN CLASES",
+      "LLEGA A TIEMPO",
+      "ATIENDE JUNTAS DE PADRES"
+    ],
+    casa: [],
+    aprendizaje: [
+      "COMPLETA TRABAJOS A TIEMPO",
+      "PARTICIPA EN ACTIVIDADES DE APRENDIZAJE",
+      "PRÁCTICA DIARIMAENTE LO ESTUDIADO"
+    ]
+  },
+
+  // Sexto Perito Contador
+  'pc-sexto': {
+    academicas: [
+      "CONTABILIDAD BANCARIA",
+      "CONTABILIDAD GUBERNAMENTAL",
+      "ESTADÍSTICA COMERCIAL",
+      "ORGANIZACIÓN DE EMPRESAS",
+      "ÉTICA PROFESIONAL Y R.H",
+      "PRÁCTICA SUPERVISADA",
+      "AUDITORÍA",
+      "DERECHO MERCANTIL Y N.D.L",
+      "COMPUTACIÓN",
+      "SEMINARIO",
+      "PROGRAMACIÓN",
+      "MATEMÁTICA BÁSICA",
+      "BIOLOGÍA GENERAL"
+    ],
+    extracurriculares: [
+      "PROGRAMA DE LECTURA",
+      "MORAL CRISTIANA"
+    ],
+    comportamiento: [
+      "RESPETA AUTORIDAD",
+      "INTERACTÚA BIEN CON SUS COMPAÑEROS",
+      "ACEPTA RESPONSABILIDAD DE SUS ACCIONES",
+      "PRÁCTICA VALORES MORALES DIARIAMENTE",
+      "RESPONSABLE EN CLASES",
+      "LLEGA A TIEMPO",
+      "ATIENDE JUNTAS DE PADRES"
+    ],
+    casa: [],
+    aprendizaje: [
+      "COMPLETA TRABAJOS A TIEMPO",
+      "PARTICIPA EN ACTIVIDADES DE APRENDIZAJE",
+      "PRÁCTICA DIARIMAENTE LO ESTUDIADO"
+    ]
+  }
 };
+
+// Recolectar todas las materias únicas de todos los grados
+const todasLasMaterias = new Set<string>();
+const materiaTipoMap: Record<string, string> = {};
+
+// Mapear tipos de evaluación a tipos de materia
+const evaluacionATipoMateria = {
+  'EXTRACURRICULAR': 'EXTRACURRICULAR',
+  'COMPORTAMIENTO': 'HABITO',
+  'APRENDIZAJE': 'ACADEMICA',
+  'CASA': 'HOGAR'
+};
+
+// Recolectar materias y asignar tipos
+for (const [grado, categorias] of Object.entries(materiasPorGrado)) {
+  for (const [categoria, materias] of Object.entries(categorias)) {
+    for (const materia of materias) {
+      todasLasMaterias.add(materia);
+      
+      // Asignar tipo basado en la categoría
+      if (categoria === 'academicas') {
+        materiaTipoMap[materia] = 'ACADEMICA';  // Materias académicas van a tipo ACADEMICA
+      } else if (categoria === 'extracurriculares') {
+        materiaTipoMap[materia] = 'EXTRACURRICULAR';
+      } else if (categoria === 'comportamiento') {
+        materiaTipoMap[materia] = 'HABITO';  // Comportamiento va a tipo HABITO
+      } else if (categoria === 'casa') {
+        materiaTipoMap[materia] = 'HOGAR';    // Casa va a tipo HOGAR
+      } else if (categoria === 'aprendizaje') {
+        materiaTipoMap[materia] = 'ACADEMICA'; // Aprendizaje también va a ACADEMICA
+      }
+    }
+  }
+}
 
 // Función para obtener el tipo de evaluación basado en el nombre
 function getTipoEvaluacion(nombre: string): string {
-  return materiaTipoMap[nombre] || EvaluacionTipo.APRENDIZAJE;
+  return materiaTipoMap[nombre] || 'ACADEMICA';
 }
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Iniciando seed simplificado - Solo Materias y Tipos');
+  console.log('🌱 Iniciando seed simplificado - Materias Organizadas por Grado y Tipo');
 
   // 1. Crear tipos de materia
   const tiposMateria = [
@@ -113,25 +359,24 @@ async function main() {
     }
   }
 
-  // 2. Mapear tipos de evaluación a tipos de materia
-  const evaluacionATipoMateria = {
-    'EXTRACURRICULAR': 'EXTRACURRICULAR',
-    'COMPORTAMIENTO': 'HABITO',
-    'APRENDIZAJE': 'ACADEMICA',
-    'CASA': 'HOGAR'
-  };
-
-  console.log('📚 Creando materias...');
+  console.log('📚 Creando materias organizadas por grados...');
   
-  // 3. Crear las materias en la base de datos
-  const materiasCreadas: Array<{id: string, nombre: string}> = [];
+  // 2. Crear las materias en la base de datos
+  const materiasCreadas: Array<{id: string, nombre: string, tipo: string}> = [];
   let orden = 1;
   
-  for (const nombreMateria of materiasUnicas) {
+  // Contadores para mostrar estadísticas
+  let contadorAcademicas = 0;
+  let contadorExtracurriculares = 0;
+  let contadorComportamiento = 0;
+  let contadorCasa = 0;
+  let contadorAprendizaje = 0;
+  
+  for (const nombreMateria of todasLasMaterias) {
     const tipo = getTipoEvaluacion(nombreMateria);
     
     // Obtener el nombre del tipo de materia basado en el tipo de evaluación
-    const nombreTipoMateria = evaluacionATipoMateria[tipo as keyof typeof evaluacionATipoMateria] || 'ACADEMICA';
+    const nombreTipoMateria = materiaTipoMap[nombreMateria] || 'ACADEMICA';
     
     // Obtener el tipo de materia existente
     const tipoMateria = await prisma.tipoMateria.findUnique({
@@ -150,8 +395,8 @@ async function main() {
       create: {
         nombre: nombreMateria,
         codigo: `MAT-${orden.toString().padStart(3, '0')}`,
-        creditos: tipo === "EXTRACURRICULAR" ? 0 : 1,
-        esExtracurricular: tipo === 'EXTRACURRICULAR',
+        creditos: nombreTipoMateria === 'EXTRACURRICULAR' ? 0 : 1,
+        esExtracurricular: nombreTipoMateria === 'EXTRACURRICULAR',
         orden: orden++,
         tipoMateriaId: tipoMateria.id
       },
@@ -160,12 +405,47 @@ async function main() {
       }
     });
     
-    materiasCreadas.push(materia);
+    materiasCreadas.push({...materia, tipo});
+    
+    // Contar por tipo para estadísticas
+    if (nombreTipoMateria === 'ACADEMICA') {
+      contadorAcademicas++;
+    } else if (nombreTipoMateria === 'EXTRACURRICULAR') {
+      contadorExtracurriculares++;
+    } else if (nombreTipoMateria === 'HABITO') {
+      contadorComportamiento++;
+    } else if (nombreTipoMateria === 'HOGAR') {
+      contadorCasa++;
+    }
+    
     console.log(`✅ Materia creada: ${materia.nombre} (${materia.tipoMateria?.nombre})`);
   }
   
-  console.log(`🎉 Se han creado ${materiasCreadas.length} materias.`);
-  console.log('✅ Seed simplificado completado exitosamente');
+  // Mostrar estadísticas finales
+  console.log('\n📊 ESTADÍSTICAS DE MATERIAS CREADAS:');
+  console.log(`📚 Áreas Académicas: ${contadorAcademicas}`);
+  console.log(`🎯 Áreas Extracurriculares: ${contadorExtracurriculares}`);
+  console.log(`🤝 Comportamiento: ${contadorComportamiento}`);
+  console.log(`🏠 Hábitos en Casa: ${contadorCasa}`);
+  console.log(`🎉 TOTAL: ${materiasCreadas.length} materias`);
+  
+  // Mostrar resumen por grados
+  console.log('\n📓 RESUMEN POR GRADOS:');
+  for (const [grado, categorias] of Object.entries(materiasPorGrado)) {
+    let totalGrado = 0;
+    console.log(`\n📖 ${grado.toUpperCase()}:`);
+    
+    for (const [categoria, materias] of Object.entries(categorias)) {
+      if (materias.length > 0) {
+        console.log(`   ${categoria}: ${materias.length} materias`);
+        totalGrado += materias.length;
+      }
+    }
+    console.log(`   Total: ${totalGrado} materias`);
+  }
+  
+  console.log('\n✅ Seed simplificado completado exitosamente');
+  console.log('🎯 Materias organizadas por grados y tipos listas para usar');
 }
 
 main()
