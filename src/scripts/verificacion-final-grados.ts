@@ -12,7 +12,7 @@ async function verificacionFinalGrados() {
     const materiasConGrados = await prisma.materia.count({
       where: {
         grados: {
-          not: []
+          isEmpty: false
         }
       }
     });

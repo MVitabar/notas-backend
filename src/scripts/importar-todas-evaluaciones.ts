@@ -18,7 +18,7 @@ async function importarTodasEvaluaciones() {
     const materiasExistentes = await prisma.materia.findMany({
       select: {
         id: true,
-        nombre: true
+        nombre: true,
         tipoMateriaId: true
       },
       orderBy: {
@@ -82,7 +82,7 @@ async function importarTodasEvaluaciones() {
         }
 
         // Verificar si ya existe la evaluación
-        const existente = await prisma.evaluacionHabito.findUnique({
+        const existente = await prisma.evaluacionHabito.findFirst({
           where: { 
             nombre: evalData.nombre,
             tipo: tipoMap[evalData.tipo]
