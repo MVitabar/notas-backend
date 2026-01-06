@@ -35,11 +35,10 @@ async function bootstrap() {
     next();
   });
 
-  // Add request logging middleware
+  // Add request logging middleware (simplified to reduce memory)
   app.use((req, res, next) => {
-    const { method, originalUrl, headers } = req;
+    const { method, originalUrl } = req;
     logger.debug(`[${new Date().toISOString()}] ${method} ${originalUrl}`);
-    logger.debug(`Headers: ${JSON.stringify(headers, null, 2)}`);
     next();
   });
 
@@ -54,14 +53,6 @@ async function bootstrap() {
       },
     }),
   );
-
-  // Add request logging middleware
-  app.use((req, res, next) => {
-    const { method, originalUrl, headers } = req;
-    logger.debug(`[${new Date().toISOString()}] ${method} ${originalUrl}`);
-    logger.debug(`Headers: ${JSON.stringify(headers, null, 2)}`);
-    next();
-  });
 
   const port = configService.get<number>('PORT', 3001);
   await app.listen(port);
