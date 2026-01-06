@@ -108,17 +108,32 @@ export class CalificacionesService {
       // Solo verificar userMateria si no es extracurricular
       if (userMateriaId) {
         console.log('Buscando materia a partir de userMateriaId:', userMateriaId);
-        const userMateria = await this.prisma.userMateria.findUnique({
+        
+        // Primero intentar buscar como userMateriaId
+        let userMateria = await this.prisma.userMateria.findUnique({
           where: { id: userMateriaId },
           select: { materiaId: true }
         });
         
-        if (!userMateria) {
-          throw new BadRequestException('No se encontró la relación usuario-materia especificada');
+        if (userMateria) {
+          // Si se encontró la relación, usar el materiaId de la relación
+          materiaIdToUse = userMateria.materiaId;
+          console.log('Materia encontrada a través de userMateriaId:', materiaIdToUse);
+        } else {
+          // Si no se encontró como userMateriaId, intentar como materiaId
+          const materia = await this.prisma.materia.findUnique({
+            where: { id: userMateriaId },
+            select: { id: true }
+          });
+          
+          if (materia) {
+            // Si es un materiaId, usarlo directamente
+            materiaIdToUse = materia.id;
+            console.log('userMateriaId era en realidad un materiaId:', materiaIdToUse);
+          } else {
+            throw new BadRequestException('No se encontró la relación usuario-materia ni la materia especificada');
+          }
         }
-        
-        materiaIdToUse = userMateria.materiaId;
-        console.log('Materia encontrada a partir de userMateriaId:', materiaIdToUse);
       } else if (!materiaId) {
         // Si no es extracurricular y no hay materiaId, es un error
         throw new BadRequestException('Se requiere un ID de materia o un ID de relación usuario-materia para materias regulares');
@@ -384,6 +399,7 @@ export class CalificacionesService {
         calificacion: rest.calificacion,
         valorConceptual: rest.valorConceptual,
         comentario: rest.comentario,
+        unidad: rest.unidad,
         fecha: new Date(),
       },
       include: {
@@ -529,6 +545,9 @@ export class CalificacionesService {
         }
         if (updateCalificacionDto.tipoEvaluacion) {
           updateData.tipoEvaluacion = updateCalificacionDto.tipoEvaluacion;
+        }
+        if (updateCalificacionDto.unidad !== undefined) {
+          updateData.unidad = updateCalificacionDto.unidad;
         }
 
         // 6. Log the update data

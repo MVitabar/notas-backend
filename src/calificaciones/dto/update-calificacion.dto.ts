@@ -54,6 +54,10 @@ export class UpdateCalificacionDto {
   @IsOptional()
   comentario?: string;
 
+  @IsString()
+  @IsOptional()
+  unidad?: string;
+
   // Validador personalizado
   validate?() {
     if (this.tipoCalificacion === TipoCalificacion.NUMERICA && this.calificacion === undefined) {

@@ -78,6 +78,10 @@ export class CreateCalificacionDto {
   @IsOptional()
   comentario?: string;
 
+  @IsString()
+  @IsOptional()
+  unidad?: string;
+
   // Validador personalizado para asegurar que al menos un tipo de calificación esté presente
   validate() {
     if (this.tipoCalificacion === TipoCalificacion.NUMERICA && this.calificacion === undefined) {

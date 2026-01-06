@@ -152,7 +152,7 @@ model Calificacion {
   materia          Materia          @relation(fields: [materiaId], references: [id], onDelete: Cascade)
   periodo          PeriodoAcademico @relation(fields: [periodoId], references: [id], onDelete: Cascade)
 
-  @@unique([estudianteId, materiaId, periodoId, tipoEvaluacion, unidad])
+  @@unique([estudianteId, materiaId, periodoId, tipoEvaluacion])
   @@index([estudianteId])
   @@index([materiaId])
   @@index([periodoId])

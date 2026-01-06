@@ -69,26 +69,45 @@ export class MateriasService {
     // Verificar si la materia existe
     await this.findOne(asignarMateriaDto.materiaId);
 
-    // Obtener el período académico actual
-    const currentPeriod = await this.prisma.periodoAcademico.findFirst({
-      where: { isCurrent: true }
+    // Obtener todos los períodos académicos
+    const allPeriods = await this.prisma.periodoAcademico.findMany({
+      // No filtrar por status, incluir todos los períodos
     });
 
-    if (!currentPeriod) {
-      throw new NotFoundException('No se encontró un período académico activo');
+    if (allPeriods.length === 0) {
+      throw new NotFoundException('No se encontraron períodos académicos');
     }
 
     try {
-      return await this.prisma.userMateria.create({
-        data: {
+      // Crear relaciones para todos los períodos
+      const userMateriaData = allPeriods.map(periodo => ({
+        docenteId: userId,
+        materiaId: asignarMateriaDto.materiaId,
+        seccion: asignarMateriaDto.seccion,
+        horario: asignarMateriaDto.horario,
+        periodo: periodo.name,
+        periodoAcademicoId: periodo.id,
+        estado: 'activo'
+      }));
+
+      const result = await this.prisma.userMateria.createMany({
+        data: userMateriaData,
+        skipDuplicates: true
+      });
+
+      // Retornar la primera relación creada para mantener compatibilidad
+      const firstRelation = await this.prisma.userMateria.findFirst({
+        where: {
           docenteId: userId,
           materiaId: asignarMateriaDto.materiaId,
-          seccion: asignarMateriaDto.seccion,
-          horario: asignarMateriaDto.horario,
-          periodo: currentPeriod.name, // Usar el nombre del período actual
-          periodoAcademicoId: currentPeriod.id, // Agregar el ID del período académico
         },
+        include: {
+          materia: true,
+          periodoAcademico: true
+        }
       });
+
+      return firstRelation;
     } catch (error) {
       if (error.code === 'P2002') {
         throw new ConflictException('Esta asignación ya existe');
@@ -98,10 +117,50 @@ export class MateriasService {
   }
 
   async getMateriasByDocente(userId: string) {
-    return this.prisma.userMateria.findMany({
+    const userMaterias = await this.prisma.userMateria.findMany({
       where: { docenteId: userId },
-      include: { materia: true },
+      include: { 
+        materia: true,
+        periodoAcademico: true
+      },
     });
+
+    // Agrupar por materia para evitar duplicados
+    const materiasUnicas = userMaterias.reduce((acc, userMateria) => {
+      const materiaId = userMateria.materiaId;
+      
+      // Si no hemos agregado esta materia aún, la agregamos
+      if (!acc[materiaId]) {
+        acc[materiaId] = {
+          id: userMateria.materia.id,
+          nombre: userMateria.materia.nombre,
+          codigo: userMateria.materia.codigo,
+          activa: userMateria.materia.activa,
+          descripcion: userMateria.materia.descripcion,
+          creditos: userMateria.materia.creditos,
+          esExtracurricular: userMateria.materia.esExtracurricular,
+          tipoMateriaId: userMateria.materia.tipoMateriaId,
+          orden: userMateria.materia.orden,
+          grados: userMateria.materia.grados,
+          createdAt: userMateria.materia.createdAt,
+          updatedAt: userMateria.materia.updatedAt,
+          // Agregar información de períodos para referencia
+          periodosAsignados: userMaterias
+            .filter(um => um.materiaId === materiaId)
+            .map(um => ({
+              id: um.periodoAcademico.id,
+              name: um.periodoAcademico.name,
+              isCurrent: um.periodoAcademico.isCurrent,
+              status: um.periodoAcademico.status
+            }))
+        };
+      }
+      
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Convertir a array
+    return Object.values(materiasUnicas);
   }
 
   async removeAsignacion(userId: string, asignacionId: string) {

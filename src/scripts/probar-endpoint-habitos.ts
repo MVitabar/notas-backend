@@ -1,7 +1,16 @@
 import { PrismaClient } from '@prisma/client';
 import { CalificacionHabitoService } from '../calificaciones/calificacion-habito.service';
+import { PrismaExtendedService } from '../prisma/prisma-extended.service';
+import { PeriodoUnidadService } from '../academic-period/periodo-unidad.service';
+import { PrismaService } from '../prisma/prisma.service';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaExtendedService();
+const prismaService = new PrismaService();
+const periodoUnidadService = new PeriodoUnidadService(prismaService);
+
+// Initialize the connections
+prisma.onModuleInit().catch(console.error);
+prismaService.onModuleInit().catch(console.error);
 
 async function probarEndpointHabitos() {
   console.log('🧪 Probando endpoint de hábitos por estudiante...');
@@ -37,7 +46,7 @@ async function probarEndpointHabitos() {
   console.log(`📅 Período: ${periodo.name} (${periodo.id})`);
 
   // 3. Probar el servicio directamente
-  const calificacionService = new CalificacionHabitoService(prisma, null);
+  const calificacionService = new CalificacionHabitoService(prisma, periodoUnidadService);
 
   try {
     console.log('\n🔄 Llamando al servicio obtenerCalificacionesPorEstudiante...');

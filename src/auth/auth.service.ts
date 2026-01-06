@@ -354,14 +354,13 @@ export class AuthService {
 
         // Create relationships for all subjects
         if (allSubjects.length > 0) {
-          // Try to get the current academic period
-          let currentPeriod = await this.prisma.periodoAcademico.findFirst({
-            where: { isCurrent: true }
+          // Get all academic periods
+          const allPeriods = await this.prisma.periodoAcademico.findMany({
+            // No filtrar por status, incluir todos los períodos
           });
 
-          // If no current period exists, skip creating relationships
-          if (!currentPeriod) {
-            this.logger.log('No active academic period found. Skipping subject relationships creation.');
+          if (allPeriods.length === 0) {
+            this.logger.log('No academic periods found. Skipping subject relationships creation.');
             // Transform the response before returning
             const { password, ...result } = newUser;
             const perfilDocente = result.perfilDocente ? {
@@ -375,16 +374,21 @@ export class AuthService {
             } as UserWithoutPassword;
           }
 
-          // Create subject relationships with the period
-          const subjectRelationships = allSubjects.map(materia => ({
-            docenteId: newUser.id,
-            materiaId: materia.id,
-            seccion: 'A', // Default section
-            horario: 'Por definir',
-            periodo: currentPeriod.name,
-            estado: 'activo',
-            periodoAcademicoId: currentPeriod.id
-          }));
+          // Create subject relationships for all periods
+          const subjectRelationships: any[] = [];
+          for (const materia of allSubjects) {
+            for (const periodo of allPeriods) {
+              subjectRelationships.push({
+                docenteId: newUser.id,
+                materiaId: materia.id,
+                seccion: 'A', // Default section
+                horario: 'Por definir',
+                periodo: periodo.name,
+                estado: 'activo',
+                periodoAcademicoId: periodo.id
+              });
+            }
+          }
 
           await this.prisma.userMateria.createMany({
             data: subjectRelationships,
@@ -671,19 +675,33 @@ export class AuthService {
         },
       });
 
-      return teachers.map(teacher => ({
-        id: teacher.id,
-        nombre: teacher.nombre,
-        apellido: teacher.apellido,
-        email: teacher.email,
-        telefono: teacher.telefono,
-        activo: teacher.activo,
-        materias: teacher.materias.map(m => ({
-          id: m.materia.id,
-          nombre: m.materia.nombre
-        })),
-        grados: teacher.perfilDocente?.grados || []
-      }));
+      return teachers.map(teacher => {
+        // Agrupar materias para evitar duplicados
+        const materiasUnicas = teacher.materias?.reduce((acc, m) => {
+          const materiaId = m.materiaId;
+          
+          // Si no hemos agregado esta materia aún, la agregamos
+          if (!acc[materiaId]) {
+            acc[materiaId] = {
+              id: m.materia.id,
+              nombre: m.materia.nombre
+            };
+          }
+          
+          return acc;
+        }, {} as Record<string, any>) || {};
+
+        return {
+          id: teacher.id,
+          nombre: teacher.nombre,
+          apellido: teacher.apellido,
+          email: teacher.email,
+          telefono: teacher.telefono,
+          activo: teacher.activo,
+          materias: Object.values(materiasUnicas),
+          grados: teacher.perfilDocente?.grados || []
+        };
+      });
     } catch (error) {
       console.error('Error al obtener la lista de docentes:', error);
       throw new InternalServerErrorException('Error al obtener la lista de docentes');
@@ -1007,20 +1025,43 @@ export class AuthService {
         materiasCount: updatedTeacher?.materias?.length || 0
       })}`);
 
-      // Format the response to include materias with their related data
+      // Format the response to include unique materias with their related data
       const formattedTeacher = updatedTeacher ? {
         ...updatedTeacher,
-        materias: updatedTeacher.materias?.map(um => ({
-          id: um.id,
-          materiaId: um.materiaId,
-          materia: um.materia,
-          seccion: um.seccion,
-          horario: um.horario,
-          periodo: um.periodo,
-          estado: um.estado,
-          periodoAcademicoId: um.periodoAcademicoId
-        })) || []
+        // Agrupar materias para evitar duplicados
+        materias: updatedTeacher.materias?.reduce((acc, um) => {
+          const materiaId = um.materiaId;
+          
+          // Si no hemos agregado esta materia aún, la agregamos
+          if (!acc[materiaId]) {
+            acc[materiaId] = {
+              id: um.id,
+              materiaId: um.materiaId,
+              materia: um.materia,
+              seccion: um.seccion,
+              horario: um.horario,
+              periodo: um.periodo,
+              estado: um.estado,
+              periodoAcademicoId: um.periodoAcademicoId,
+              // Agregar información de períodos para referencia
+              periodosAsignados: updatedTeacher.materias
+                .filter(umFilter => umFilter.materiaId === materiaId)
+                .map(umFilter => ({
+                  id: umFilter.periodoAcademicoId,
+                  name: umFilter.periodo,
+                  estado: umFilter.estado
+                }))
+            };
+          }
+          
+          return acc;
+        }, {} as Record<string, any>) || {}
       } : null;
+
+      // Convertir el objeto de materias a array
+      if (formattedTeacher && formattedTeacher.materias) {
+        formattedTeacher.materias = Object.values(formattedTeacher.materias);
+      }
 
       if (!updatedTeacher) {
         throw new NotFoundException('No se pudo recuperar los datos actualizados del docente');
