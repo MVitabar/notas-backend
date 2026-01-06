@@ -58,13 +58,11 @@ export class CalificacionHabitoService {
       docenteId,
       calificaciones: JSON.parse(JSON.stringify(calificaciones)) // Para evitar problemas de referencia circular
     });
-    console.log('=== INICIO actualizarCalificaciones ===');
-    console.log('Datos recibidos:', {
-      estudianteId,
-      periodoId,
-      docenteId,
-      calificaciones
-    });
+    
+    // Obtener la unidad correspondiente al período
+    const unidadActual = await this.periodoUnidadService.getUnidadPorPeriodo(periodoId);
+    console.log(`🎯 Unidad actual para período ${periodoId}: ${unidadActual}`);
+    
     // Verificar si el estudiante existe
     const estudiante = await this.prisma.student.findUnique({
       where: { id: estudianteId }
@@ -95,33 +93,6 @@ export class CalificacionHabitoService {
     // Usar una transacción para asegurar la integridad de los datos
     return this.prisma.$transaction(async (prisma) => {
       const resultados: any[] = [];
-
-      // Verificar si el estudiante existe
-      const estudiante = await prisma.student.findUnique({
-        where: { id: estudianteId }
-      });
-
-      if (!estudiante) {
-        throw new NotFoundException('Estudiante no encontrado');
-      }
-
-      // Verificar si el período existe
-      const periodo = await prisma.periodoAcademico.findUnique({
-        where: { id: periodoId }
-      });
-
-      if (!periodo) {
-        throw new NotFoundException('Período académico no encontrado');
-      }
-
-      // Verificar si el docente existe
-      const docente = await prisma.user.findUnique({
-        where: { id: docenteId }
-      });
-
-      if (!docente) {
-        throw new NotFoundException('Docente no encontrado');
-      }
 
       for (const calificacion of calificaciones) {
         console.log('\n--- Procesando evaluación ---');
@@ -236,14 +207,14 @@ export class CalificacionHabitoService {
           console.log('\n🔍 Buscando calificación existente para:');
           console.log('- Estudiante ID:', estudianteId);
           console.log('- Período ID:', periodoId);
-          console.log('- Evaluación ID:', evaluacion.id); // Usar el ID de evaluación correcto
+          console.log('- Evaluación ID:', evaluacion.id);
           console.log('- Docente ID:', docenteId);
           
           const calificacionExistente = await prisma.calificacionHabito.findFirst({
             where: {
               estudianteId,
               periodoId,
-              evaluacionHabitoId: evaluacion.id, // Usar el ID de evaluación correcto
+              evaluacionHabitoId: evaluacion.id,
               docenteId
             },
             include: {
@@ -293,12 +264,19 @@ export class CalificacionHabitoService {
             }
           });
 
+          // 🔥 CORRECCIÓN: Usar solo la unidad actual del período
+          // En lugar de guardar todos u1, u2, u3, u4, guardar solo el valor de la unidad actual
+          const valorActual = calificacion[unidadActual];
+          
           // Preparar los datos base para actualizar/crear
           const baseData: any = {
-            u1: calificacion.u1 !== undefined ? calificacion.u1 : null,
-            u2: calificacion.u2 !== undefined ? calificacion.u2 : null,
-            u3: calificacion.u3 !== undefined ? calificacion.u3 : null,
-            u4: calificacion.u4 !== undefined ? calificacion.u4 : null,
+            // Mantener los valores existentes para otras unidades
+            u1: calificacionExistente?.u1 || null,
+            u2: calificacionExistente?.u2 || null,
+            u3: calificacionExistente?.u3 || null,
+            u4: calificacionExistente?.u4 || null,
+            // Actualizar solo la unidad actual
+            [unidadActual]: valorActual !== undefined ? valorActual : null,
             comentario: calificacion.comentario || `Evaluación de ${evaluacion.nombre}`,
             evaluacionHabitoId: evaluacion.id,
             estudianteId,
@@ -306,6 +284,18 @@ export class CalificacionHabitoService {
             docenteId,
             updatedAt: new Date()
           };
+
+          console.log('\n🎯 USANDO UNIDAD DINÁMICA:', {
+            unidadActual,
+            valorEnviado: valorActual,
+            datosActualizados: {
+              u1: baseData.u1,
+              u2: baseData.u2,
+              u3: baseData.u3,
+              u4: baseData.u4,
+              comentario: baseData.comentario
+            }
+          });
 
           // Datos para crear un nuevo registro
           const createData = {
@@ -353,6 +343,7 @@ export class CalificacionHabitoService {
             evaluacion: evaluacion.nombre,
             tipo: evaluacion.tipo,
             esNueva: !calificacionExistente,
+            unidadActual,
             valores: baseData
           });
 
@@ -446,6 +437,7 @@ export class CalificacionHabitoService {
             nombre: evaluacion.nombre,
             tipo: evaluacion.tipo,
             esExtracurricular: evaluacion.tipo === 'EXTRACURRICULAR',
+            unidadActual,
             evaluacionHabito: {
               ...(resultado.evaluacionHabito || {}),
               tipo: evaluacion.tipo
@@ -465,7 +457,8 @@ export class CalificacionHabitoService {
             contexto: {
               estudianteId,
               periodoId,
-              docenteId
+              docenteId,
+              unidadActual
             }
           });
           throw error;
