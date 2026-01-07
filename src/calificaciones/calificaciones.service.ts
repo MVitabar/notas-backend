@@ -14,6 +14,7 @@ import { CreateCalificacionDto } from './dto/create-calificacion.dto';
 import { UpdateCalificacionDto } from './dto/update-calificacion.dto';
 import { MateriasService } from '../materias/materias.service';
 import { AcademicPeriodService } from '../academic-period/academic-period.service';
+import { PeriodoUnidadService } from '../academic-period/periodo-unidad.service';
 
 // Define the type based on the Prisma model
 type CalificacionWithRelations = {
@@ -44,7 +45,8 @@ export class CalificacionesService {
   constructor(
     @Inject(forwardRef(() => MateriasService))
     private materiasService: MateriasService,
-    private academicPeriodService: AcademicPeriodService
+    private academicPeriodService: AcademicPeriodService,
+    private periodoUnidadService: PeriodoUnidadService
   ) {
     this.prisma = new PrismaClient();
   }
@@ -387,6 +389,27 @@ export class CalificacionesService {
       throw new ConflictException('Ya existe una calificación para este estudiante, materia y período');
     }
 
+    // 🔥 CORRECCIÓN: Obtener unidad dinámica del período para materias extracurriculares
+    let unidadToUse = rest.unidad; // Valor por defecto del frontend
+    
+    if (esExtraescolar) {
+      try {
+        console.log('🔍 Obteniendo unidad dinámica para materia extracurricular...');
+        const unidadActual = await this.periodoUnidadService.getUnidadPorPeriodo(periodoId);
+        unidadToUse = unidadActual;
+        console.log('✅ Unidad dinámica obtenida:', {
+          periodoId,
+          unidadActual,
+          unidadOriginal: rest.unidad,
+          unidadFinal: unidadToUse
+        });
+      } catch (error) {
+        console.error('⚠️ Error obteniendo unidad dinámica, usando unidad del frontend:', error);
+        // Si falla, usar la unidad del frontend como fallback
+        unidadToUse = rest.unidad;
+      }
+    }
+
     // Crear la calificación
     return this.prisma.calificacion.create({
       data: {
@@ -399,7 +422,7 @@ export class CalificacionesService {
         calificacion: rest.calificacion,
         valorConceptual: rest.valorConceptual,
         comentario: rest.comentario,
-        unidad: rest.unidad,
+        unidad: unidadToUse,
         fecha: new Date(),
       },
       include: {
@@ -510,6 +533,34 @@ export class CalificacionesService {
           updatedAt: new Date() // Force update timestamp
         };
 
+        // 🔥 CORRECCIÓN: Obtener unidad dinámica para materias extracurriculares
+        if (updateCalificacionDto.unidad !== undefined) {
+          // Verificar si la materia es extracurricular
+          const materia = await prisma.materia.findUnique({
+            where: { id: currentRecord.materiaId },
+            select: { esExtracurricular: true }
+          });
+          
+          if (materia?.esExtracurricular) {
+            try {
+              console.log('🔍 Obteniendo unidad dinámica para actualización de materia extracurricular...');
+              const unidadActual = await this.periodoUnidadService.getUnidadPorPeriodo(currentRecord.periodoId);
+              updateData.unidad = unidadActual;
+              console.log('✅ Unidad dinámica obtenida para actualización:', {
+                periodoId: currentRecord.periodoId,
+                unidadActual,
+                unidadOriginal: updateCalificacionDto.unidad,
+                unidadFinal: updateData.unidad
+              });
+            } catch (error) {
+              console.error('⚠️ Error obteniendo unidad dinámica en actualización, usando unidad del frontend:', error);
+              updateData.unidad = updateCalificacionDto.unidad;
+            }
+          } else {
+            updateData.unidad = updateCalificacionDto.unidad;
+          }
+        }
+
         // Handle grade update
         if (updateCalificacionDto.calificacion !== undefined) {
           updateData.calificacion = updateCalificacionDto.calificacion;
@@ -545,9 +596,6 @@ export class CalificacionesService {
         }
         if (updateCalificacionDto.tipoEvaluacion) {
           updateData.tipoEvaluacion = updateCalificacionDto.tipoEvaluacion;
-        }
-        if (updateCalificacionDto.unidad !== undefined) {
-          updateData.unidad = updateCalificacionDto.unidad;
         }
 
         // 6. Log the update data
@@ -621,7 +669,18 @@ export class CalificacionesService {
     return this.prisma.calificacion.findMany({
       where,
       include: {
-        materia: true,
+        materia: {
+          select: {
+            id: true,
+            nombre: true,
+            esExtracurricular: true,
+            tipoMateria: {
+              select: {
+                nombre: true
+              }
+            }
+          }
+        },
         periodo: true,
         docente: {
           select: {
