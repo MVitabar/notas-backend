@@ -40,7 +40,7 @@ export class CalificacionesController {
   constructor(private readonly calificacionesService: CalificacionesService) {}
 
   @Post()
-  @Roles(UserRole.DOCENTE)
+  @Roles(UserRole.DOCENTE, UserRole.ADMIN)
   @UsePipes(new ValidationPipe({ transform: true }))
   async crear(
     @Req() req: RequestWithUser,
