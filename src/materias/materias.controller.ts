@@ -37,8 +37,13 @@ export class MateriasController {
   }
 
   @Get('docente/mis-materias')
-  @Roles(UserRole.DOCENTE)
+  @Roles(UserRole.DOCENTE, UserRole.ADMIN)
   getMisMaterias(@Req() req) {
+    // Si es admin, devolver todas las materias activas
+    if (req.user.rol === UserRole.ADMIN) {
+      return this.materiasService.findAll();
+    }
+    // Si es docente, devolver solo sus materias asignadas
     return this.materiasService.getMateriasByDocente(req.user.userId);
   }
 

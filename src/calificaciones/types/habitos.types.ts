@@ -11,6 +11,7 @@ export interface GrupoHabito {
 export interface HabitoEstudiante {
   id?: string;
   evaluacionHabitoId: string;
+  materiaId?: string; // ID de la materia asociada (para extracurriculares)
   nombre: string;
   descripcion: string | null;
   tipo: string;
@@ -21,9 +22,9 @@ export interface HabitoEstudiante {
   u3: string | null;
   u4: string | null;
   comentario: string | null;
-  createdAt: Date | null;
-  updatedAt: Date | null;
-  calificaciones?: any[]; // Array de calificaciones históricas
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+  calificaciones?: any[];
   esMateria: boolean;
 }
 

@@ -116,10 +116,17 @@ export class CalificacionHabitoController {
         throw new BadRequestException('No se pudo identificar al docente');
       }
 
+      // 🔥 CORRECCIÓN: Mapear IDs de materia a IDs de evaluación para extracurriculares
+      const calificacionesMapeadas = await this.calificacionHabitoService.mapearIdsMateriaAEvaluacion(
+        data.calificaciones,
+        estudianteId,
+        data.periodoId
+      );
+
       await this.calificacionHabitoService.actualizarCalificaciones(
         estudianteId,
         data.periodoId,
-        data.calificaciones,
+        calificacionesMapeadas,
         docenteId
       );
       

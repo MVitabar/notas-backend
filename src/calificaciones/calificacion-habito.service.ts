@@ -38,6 +38,104 @@ export class CalificacionHabitoService {
     };
   }
 
+  async mapearIdsMateriaAEvaluacion(
+    calificaciones: Array<{
+      evaluacionHabitoId: string;
+      u1?: string | null;
+      u2?: string | null;
+      u3?: string | null;
+      u4?: string | null;
+      comentario?: string | null;
+    }>,
+    estudianteId: string,
+    periodoId: string
+  ) {
+    console.log('\n🔧 Iniciando mapeo de IDs de materia a evaluación...');
+    
+    const calificacionesMapeadas: Array<{
+      evaluacionHabitoId: string;
+      u1?: string | null;
+      u2?: string | null;
+      u3?: string | null;
+      u4?: string | null;
+      comentario?: string | null;
+    }> = [];
+    
+    for (const calificacion of calificaciones) {
+      console.log(`\n📋 Procesando calificación con ID: ${calificacion.evaluacionHabitoId}`);
+      
+      // Verificar si es una materia extracurricular
+      const materia = await this.prisma.materia.findUnique({
+        where: { id: calificacion.evaluacionHabitoId },
+        select: {
+          id: true,
+          nombre: true,
+          esExtracurricular: true
+        }
+      });
+      
+      if (materia && materia.esExtracurricular) {
+        console.log(`✅ Materia extracurricular encontrada: ${materia.nombre}`);
+        
+        // Buscar si ya existe una evaluación asociada a esta materia
+        let evaluacion = await this.prisma.evaluacionHabito.findFirst({
+          where: {
+            nombre: materia.nombre,
+            tipo: 'EXTRACURRICULAR'
+          },
+          select: {
+            id: true,
+            nombre: true,
+            tipo: true
+          }
+        });
+        
+        if (!evaluacion) {
+          console.log(`ℹ️ Creando evaluación para materia: ${materia.nombre}`);
+          
+          // Crear la evaluación asociada
+          evaluacion = await this.prisma.evaluacionHabito.create({
+            data: {
+              nombre: materia.nombre,
+              descripcion: `Evaluación de ${materia.nombre}`,
+              tipo: 'EXTRACURRICULAR',
+              activo: true,
+              orden: 999,
+              materia: {
+                connect: { id: materia.id }
+              }
+            },
+            select: {
+              id: true,
+              nombre: true,
+              tipo: true
+            }
+          });
+          
+          console.log(`✅ Evaluación creada: ${evaluacion.id}`);
+        } else {
+          console.log(`✅ Evaluación existente encontrada: ${evaluacion.id}`);
+        }
+        
+        // Usar el ID de evaluación en lugar del ID de materia
+        calificacionesMapeadas.push({
+          ...calificacion,
+          evaluacionHabitoId: evaluacion.id
+        });
+        
+        console.log(`🔄 ID mapeado: ${materia.id} → ${evaluacion.id}`);
+        
+      } else {
+        // No es una materia extracurricular, usar el ID original
+        console.log(`📝 Usando ID original (no es materia extracurricular): ${calificacion.evaluacionHabitoId}`);
+        calificacionesMapeadas.push(calificacion);
+      }
+    }
+    
+    console.log(`\n✅ Mapeo completado. ${calificacionesMapeadas.length} calificaciones procesadas.`);
+    return calificacionesMapeadas;
+  }
+
   async actualizarCalificaciones(
     estudianteId: string,
     periodoId: string,
@@ -119,6 +217,7 @@ export class CalificacionHabitoService {
           });
 
           let evaluacion;
+          let evaluacionIdParaGuardar: string = calificacion.evaluacionHabitoId; // 🔥 CORRECCIÓN: Inicializar con valor original
           
           if (materia) {
             console.log('✅ Materia encontrada:', materia.nombre);
@@ -172,6 +271,11 @@ export class CalificacionHabitoService {
               });
               console.log('✅ Evaluación creada:', evaluacion);
             }
+            
+            // 🔥 CORRECCIÓN: Para materias extracurriculares, usar siempre el ID de evaluación asociado
+            // en lugar del ID de materia para mantener la integridad referencial
+            let evaluacionIdParaGuardar = evaluacion.id;
+            console.log('🔧 Usando ID de evaluación para mantener integridad referencial:', evaluacion.id);
           } else {
             // Si no es una materia, buscar como evaluación normal
             console.log('\n🔍 Buscando evaluación con ID:', calificacion.evaluacionHabitoId);
@@ -189,6 +293,9 @@ export class CalificacionHabitoService {
               console.error(`❌ No se encontró ni una materia extracurricular ni una evaluación con ID: ${calificacion.evaluacionHabitoId}`);
               continue;
             }
+            
+            // 🔥 CORRECCIÓN: Para evaluaciones normales, usar el ID de evaluación
+            evaluacionIdParaGuardar = evaluacion.id;
           }
           
           console.log('✅ Evaluación encontrada:', {
@@ -207,14 +314,14 @@ export class CalificacionHabitoService {
           console.log('\n🔍 Buscando calificación existente para:');
           console.log('- Estudiante ID:', estudianteId);
           console.log('- Período ID:', periodoId);
-          console.log('- Evaluación ID:', evaluacion.id);
+          console.log('- Evaluación ID:', evaluacionIdParaGuardar);
           console.log('- Docente ID:', docenteId);
           
           const calificacionExistente = await prisma.calificacionHabito.findFirst({
             where: {
               estudianteId,
               periodoId,
-              evaluacionHabitoId: evaluacion.id,
+              evaluacionHabitoId: evaluacionIdParaGuardar, // 🔥 CORRECCIÓN: Usar el ID correcto
               docenteId
             },
             include: {
@@ -252,7 +359,7 @@ export class CalificacionHabitoService {
 
           // Log detallado de los datos recibidos
           console.log('Procesando evaluación:', {
-            evaluacionId: evaluacion.id,
+            evaluacionId: evaluacionIdParaGuardar, // 🔥 CORRECCIÓN: Usar el ID correcto
             nombre: evaluacion.nombre,
             tipo: evaluacion.tipo,
             datosEnviados: {
@@ -264,30 +371,32 @@ export class CalificacionHabitoService {
             }
           });
 
-          // 🔥 CORRECCIÓN: Usar solo la unidad actual del período
-          // En lugar de guardar todos u1, u2, u3, u4, guardar solo el valor de la unidad actual
-          const valorActual = calificacion[unidadActual];
-          
+          // 🔥 CORRECCIÓN: Guardar todos los valores enviados por el frontend
+          // no solo la unidad actual, para mayor flexibilidad
           // Preparar los datos base para actualizar/crear
           const baseData: any = {
-            // Mantener los valores existentes para otras unidades
-            u1: calificacionExistente?.u1 || null,
-            u2: calificacionExistente?.u2 || null,
-            u3: calificacionExistente?.u3 || null,
-            u4: calificacionExistente?.u4 || null,
-            // Actualizar solo la unidad actual
-            [unidadActual]: valorActual !== undefined ? valorActual : null,
+            // Mantener los valores existentes pero sobrescribir con los enviados
+            u1: calificacion.u1 !== undefined ? calificacion.u1 : (calificacionExistente?.u1 || null),
+            u2: calificacion.u2 !== undefined ? calificacion.u2 : (calificacionExistente?.u2 || null),
+            u3: calificacion.u3 !== undefined ? calificacion.u3 : (calificacionExistente?.u3 || null),
+            u4: calificacion.u4 !== undefined ? calificacion.u4 : (calificacionExistente?.u4 || null),
             comentario: calificacion.comentario || `Evaluación de ${evaluacion.nombre}`,
-            evaluacionHabitoId: evaluacion.id,
+            evaluacionHabitoId: evaluacionIdParaGuardar, // 🔥 CORRECCIÓN: Usar el ID correcto
             estudianteId,
             periodoId,
             docenteId,
             updatedAt: new Date()
           };
 
-          console.log('\n🎯 USANDO UNIDAD DINÁMICA:', {
+          console.log('\n🎯 GUARDANDO TODOS LOS VALORES:', {
             unidadActual,
-            valorEnviado: valorActual,
+            valoresEnviados: {
+              u1: calificacion.u1,
+              u2: calificacion.u2,
+              u3: calificacion.u3,
+              u4: calificacion.u4,
+              comentario: calificacion.comentario
+            },
             datosActualizados: {
               u1: baseData.u1,
               u2: baseData.u2,
@@ -301,7 +410,7 @@ export class CalificacionHabitoService {
           const createData = {
             ...baseData,
             evaluacionHabito: {
-              connect: { id: evaluacion.id }
+              connect: { id: evaluacionIdParaGuardar } // 🔥 CORRECCIÓN: Usar el ID correcto
             },
             estudiante: {
               connect: { id: estudianteId }
@@ -332,7 +441,7 @@ export class CalificacionHabitoService {
               comentario: createData.comentario
             },
             relaciones: {
-              evaluacionHabitoId: evaluacion.id,
+              evaluacionHabitoId: evaluacionIdParaGuardar, // 🔥 CORRECCIÓN: Usar el ID correcto
               estudianteId,
               periodoId,
               docenteId
@@ -635,13 +744,33 @@ export class CalificacionHabitoService {
         );
         
         // Usar el mapa de traducción para encontrar las calificaciones correctas
-        // Si es una materia, buscar calificaciones usando el ID de evaluación asociado
+        // 🔥 CORRECCIÓN: Para materias extracurriculares, usar el ID de evaluación asociada
+        // ya que las calificaciones se guardan con el ID de evaluación para mantener integridad referencial
         let evaluacionIdParaCalificaciones: string;
         if (evaluacionExistente) {
           evaluacionIdParaCalificaciones = evaluacionExistente.id;
         } else {
           // Buscar en el mapa de traducción de materia a evaluación
-          evaluacionIdParaCalificaciones = materiaIdAEvaluacionId.get(materia.id) || materia.id;
+          const evaluacionIdDelMapa = materiaIdAEvaluacionId.get(materia.id);
+          evaluacionIdParaCalificaciones = evaluacionIdDelMapa || materia.id;
+          
+          // Si no hay mapeo, buscar si existe una evaluación asociada a esta materia
+          if (!evaluacionIdDelMapa) {
+            console.log(`🔍 Buscando evaluación asociada a materia ${materia.nombre} (${materia.id})`);
+            const evaluacionAsociada = evaluacionesExtracurriculares.find(
+              e => e.nombre.toLowerCase() === materia.nombre.toLowerCase()
+            );
+            if (evaluacionAsociada) {
+              evaluacionIdParaCalificaciones = evaluacionAsociada.id;
+              console.log(`✅ Evaluación asociada encontrada: ${evaluacionAsociada.id}`);
+            }
+          }
+          
+          // Último recurso: usar el ID de materia (esto no debería ocurrir si todo está bien configurado)
+          if (!evaluacionIdParaCalificaciones) {
+            console.log(`⚠️ No se encontró evaluación asociada para materia ${materia.nombre}, usando ID de materia como fallback`);
+            evaluacionIdParaCalificaciones = materia.id;
+          }
         }
         
         const calificacionesMateria = calificacionesPorEvaluacion.get(evaluacionIdParaCalificaciones) || [];
@@ -686,6 +815,7 @@ export class CalificacionHabitoService {
         const habito: HabitoEstudiante = {
           id: ultimaCalificacion?.id,
           evaluacionHabitoId: evaluacionIdParaCalificaciones, // Usar el ID de evaluación correcto
+          materiaId: materia.id, // Incluir el ID de la materia para extracurriculares
           nombre: materia.nombre,
           descripcion: materia.descripcion || `Evaluación de ${materia.nombre}`,
           tipo: tipoEvaluacion,
@@ -716,6 +846,7 @@ export class CalificacionHabitoService {
           const habito: HabitoEstudiante = {
             id: ultimaCalificacion?.id,
             evaluacionHabitoId: evaluacion.id,
+            materiaId: evaluacion.materiaId || undefined, // Incluir materiaId si la evaluación tiene una asociada
             nombre: evaluacion.nombre,
             descripcion: evaluacion.descripcion || '',
             tipo: evaluacion.tipo,
