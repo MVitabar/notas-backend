@@ -187,6 +187,49 @@ export class CalificacionHabitoController {
     }
   }
 
+  @Patch(':id')
+  @Roles(UserRole.DOCENTE, UserRole.ADMIN)
+  async updatePartial(
+    @Param('id') id: string,
+    @Body() 
+    data: { 
+      key?: string;
+      evaluacionHabitoId?: string;
+      id?: string;
+      u1?: string; 
+      u2?: string; 
+      u3?: string; 
+      u4?: string; 
+      comentario?: string;
+      esExtraescolar?: boolean;
+    },
+    @Req() req
+  ) {
+    console.log('🔍 PATCH - Datos recibidos:', { id, data, userId: req.user.userId });
+    
+    // Extraer solo los campos que el backend necesita
+    const { key, evaluacionHabitoId, id: frontendId, ...updateData } = data;
+    
+    console.log('🔍 PATCH - UpdateData procesado:', updateData);
+    
+    try {
+      const result = await this.calificacionHabitoService.actualizarCalificacionHabito(
+        id,
+        updateData,
+        req.user.userId
+      );
+      console.log('✅ PATCH - Actualización exitosa');
+      return result;
+    } catch (error) {
+      console.error('❌ PATCH - Error detallado:', error);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error('Error en updatePartial calificación hábito:', error);
+      throw new BadRequestException('Error al actualizar la calificación de hábito');
+    }
+  }
+
   @Put(':id')
   @Roles(UserRole.DOCENTE, UserRole.ADMIN)
   async update(

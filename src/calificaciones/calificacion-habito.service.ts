@@ -613,6 +613,13 @@ export class CalificacionHabitoService {
         ]
       });
 
+      console.log(`🔍 DEBUG - Calificaciones existentes encontradas: ${calificacionesExistentes.length}`);
+      console.log(`🔍 DEBUG - EstudianteId: ${estudianteId}, PeriodoId: ${periodoId}`);
+      
+      if (calificacionesExistentes.length > 0) {
+        console.log('🔍 DEBUG - Primera calificación:', JSON.stringify(calificacionesExistentes[0], null, 2));
+      }
+
       // Agrupar calificaciones por evaluación
       const calificacionesPorEvaluacion = new Map<string, any[]>();
       
@@ -631,6 +638,16 @@ export class CalificacionHabitoService {
           materiaIdAEvaluacionId.set(calificacion.evaluacionHabito.materiaId, calificacion.evaluacionHabitoId);
         }
       }
+
+      console.log(`🔍 DEBUG - Calificaciones por evaluación:`);
+      calificacionesPorEvaluacion.forEach((calificaciones, evaluacionId) => {
+        console.log(`   - ${evaluacionId}: ${calificaciones.length} calificaciones`);
+      });
+
+      console.log(`🔍 DEBUG - MateriaId a EvaluacionId mapping:`);
+      materiaIdAEvaluacionId.forEach((evaluacionId, materiaId) => {
+        console.log(`   - ${materiaId} -> ${evaluacionId}`);
+      });
 
       // Obtener todas las evaluaciones de hábitos activas, excluyendo las extracurriculares
       const evaluacionesRegulares = await this.prisma.evaluacionHabito.findMany({
@@ -732,108 +749,156 @@ export class CalificacionHabitoService {
         ]
       });
 
+      console.log(`🔍 DEBUG - Evaluaciones extracurriculares encontradas: ${evaluacionesExtracurriculares.length}`);
+      evaluacionesExtracurriculares.forEach(e => {
+        console.log(`   - ${e.nombre} (materiaId: ${e.materiaId})`);
+      });
+
       // Mapa para evitar duplicados
       const evaluacionesProcesadas = new Set<string>();
       const resultado: HabitoEstudiante[] = [];
       
-      // 1. Procesar materias de hábitos primero (prioridad sobre evaluaciones regulares)
+      // 🔥 NUEVA LÓGICA: Primero incluir calificaciones existentes directamente
+      console.log('🔍 DEBUG - Procesando calificaciones existentes directamente...');
+      for (const [evaluacionId, calificaciones] of calificacionesPorEvaluacion.entries()) {
+        const calificacion = calificaciones[0];
+        const evaluacion = calificacion.evaluacionHabito;
+        
+        if (evaluacion && !evaluacionesProcesadas.has(evaluacionId)) {
+          console.log(`✅ Incluyendo calificación existente: ${evaluacion.nombre} (${evaluacionId})`);
+          
+          const habito: HabitoEstudiante = {
+            id: calificacion.id,
+            evaluacionHabitoId: evaluacionId,
+            materiaId: evaluacion.materiaId || undefined,
+            nombre: evaluacion.nombre,
+            descripcion: evaluacion.descripcion || '',
+            tipo: evaluacion.tipo,
+            u1: calificacion.u1 || null,
+            u2: calificacion.u2 || null,
+            u3: calificacion.u3 || null,
+            u4: calificacion.u4 || null,
+            comentario: calificacion.comentario || null,
+            createdAt: calificacion.createdAt || null,
+            updatedAt: calificacion.updatedAt || null,
+            calificaciones: calificaciones,
+            esMateria: false
+          };
+          
+          resultado.push(habito);
+          evaluacionesProcesadas.add(evaluacionId);
+        }
+      }
+      
+      console.log(`🔍 DEBUG - Calificaciones incluidas: ${resultado.length}`);
+      
+      // 1. Procesar materias de hábitos (solo para agregar nuevas que no tengan calificaciones)
       for (const materia of materiasHabitos) {
         // Buscar si ya existe una evaluación para esta materia
         const evaluacionExistente = evaluacionesExtracurriculares.find(
           e => e.nombre.toLowerCase() === materia.nombre.toLowerCase()
         );
         
-        // Usar el mapa de traducción para encontrar las calificaciones correctas
-        // 🔥 CORRECCIÓN: Para materias extracurriculares, usar el ID de evaluación asociada
-        // ya que las calificaciones se guardan con el ID de evaluación para mantener integridad referencial
+        // 🔥 CORRECCIÓN: Para extracurriculares, buscar calificaciones por materiaId también
+        // ya que pueden existir calificaciones guardadas con evaluacionHabitoId que apunta a materia
+        let calificacionesMateria: any[] = [];
         let evaluacionIdParaCalificaciones: string;
-        if (evaluacionExistente) {
+        
+        // Primero buscar calificaciones existentes por materiaId
+        const calificacionesPorMateria = calificacionesExistentes.filter(
+          cal => cal.evaluacionHabito?.materiaId === materia.id
+        );
+        
+        if (calificacionesPorMateria.length > 0) {
+          // Si hay calificaciones por materia, usar esas
+          calificacionesMateria = calificacionesPorMateria;
+          evaluacionIdParaCalificaciones = calificacionesPorMateria[0].evaluacionHabitoId;
+          console.log(`✅ Calificaciones encontradas por materiaId ${materia.id} para ${materia.nombre}:`);
+          console.log(`   - evaluacionHabitoId: ${evaluacionIdParaCalificaciones}`);
+          console.log(`   - calificaciones encontradas: ${calificacionesPorMateria.length}`);
+        } else if (evaluacionExistente) {
+          // Si hay evaluación existente, buscar por ese ID
+          calificacionesMateria = calificacionesPorEvaluacion.get(evaluacionExistente.id) || [];
           evaluacionIdParaCalificaciones = evaluacionExistente.id;
+          console.log(`✅ Usando evaluación existente ${evaluacionExistente.id} para ${materia.nombre}`);
         } else {
           // Buscar en el mapa de traducción de materia a evaluación
           const evaluacionIdDelMapa = materiaIdAEvaluacionId.get(materia.id);
-          evaluacionIdParaCalificaciones = evaluacionIdDelMapa || materia.id;
-          
-          // Si no hay mapeo, buscar si existe una evaluación asociada a esta materia
-          if (!evaluacionIdDelMapa) {
-            console.log(`🔍 Buscando evaluación asociada a materia ${materia.nombre} (${materia.id})`);
-            const evaluacionAsociada = evaluacionesExtracurriculares.find(
-              e => e.nombre.toLowerCase() === materia.nombre.toLowerCase()
-            );
-            if (evaluacionAsociada) {
-              evaluacionIdParaCalificaciones = evaluacionAsociada.id;
-              console.log(`✅ Evaluación asociada encontrada: ${evaluacionAsociada.id}`);
-            }
-          }
-          
-          // Último recurso: usar el ID de materia (esto no debería ocurrir si todo está bien configurado)
-          if (!evaluacionIdParaCalificaciones) {
-            console.log(`⚠️ No se encontró evaluación asociada para materia ${materia.nombre}, usando ID de materia como fallback`);
+          if (evaluacionIdDelMapa) {
+            calificacionesMateria = calificacionesPorEvaluacion.get(evaluacionIdDelMapa) || [];
+            evaluacionIdParaCalificaciones = evaluacionIdDelMapa;
+            console.log(`✅ Usando evaluación del mapa ${evaluacionIdDelMapa} para ${materia.nombre}`);
+          } else {
+            // Último recurso: usar el ID de materia como evaluacionHabitoId
+            calificacionesMateria = calificacionesPorEvaluacion.get(materia.id) || [];
             evaluacionIdParaCalificaciones = materia.id;
+            console.log(`⚠️ Usando ID de materia ${materia.id} como evaluacionHabitoId para ${materia.nombre} (sin calificaciones encontradas)`);
           }
         }
-        
-        const calificacionesMateria = calificacionesPorEvaluacion.get(evaluacionIdParaCalificaciones) || [];
           
         const ultimaCalificacion = calificacionesMateria[0];
         
-        // Determinar el tipo de evaluación según el tipoMateria y si es extracurricular
-        let tipoEvaluacion: string;
-        
-        if (materia.esExtracurricular) {
-          // Materias extracurriculares tradicionales
-          tipoEvaluacion = 'EXTRACURRICULAR';
-        } else if (materia.tipoMateriaId === hogarId) {
-          // HOGAR -> Hábitos en casa
-          tipoEvaluacion = 'CASA';
-        } else if (materia.tipoMateriaId === habitoId) {
-          // HABITO -> Puede ser COMPORTAMIENTO o APRENDIZAJE según el nombre
-          const comportamientos = [
-            'Respeta autoridad', 'Interactúa bien con sus compañeros', 'Respeta los derechos y propiedades de otros',
-            'Demuestra control de sí mismo', 'Acepta responsabilidad de sus acciones', 'RESPETA AUTORIDAD',
-            'INTERACTÚA BIEN CON SUS COMPAÑEROS', 'ACEPTA RESPONSABILIDAD DE SUS ACCIONES',
-            'PRÁCTICA VALORES MORALES DIARIAMENTE', 'RESPONSABLE EN CLASES', 'COMPLETA TRABAJOS A TIEMPO',
-            'PARTICIPA EN ACTIVIDADES DE APRENDIZAJE', 'LLEGA A TIEMPO', 'ATIENDE JUNTAS DE PADRES',
-            'PRÁCTICA DIARIMAENTE LO ESTUDIADO', 'RESPONSABLE EN CLASE', 'Completa Trabajos a Tiempo',
-            'Participa en actividades de aprendizaje', 'Respeta Autoridad', 'Práctica valores morales diariamente',
-            'Acepta responsabilidad de sus acciones', 'Interactúa bien con sus compañeros',
-            'Llega a tiempo', 'Respeta los derechos y propiedades de otros', 'LLEGA A TIEMPO',
-            'Atiende juntas de padres', 'Práctica diariamente lo estudiado'
-          ];
+        // 🔥 CORRECCIÓN: Solo incluir si no está ya procesada (para evitar duplicados)
+        if (!evaluacionesProcesadas.has(evaluacionIdParaCalificaciones) && ultimaCalificacion) {
+          // Determinar el tipo de evaluación según el tipoMateria y si es extracurricular
+          let tipoEvaluacion: string;
           
-          if (comportamientos.includes(materia.nombre)) {
-            tipoEvaluacion = 'COMPORTAMIENTO';
+          if (materia.esExtracurricular) {
+            // Materias extracurriculares tradicionales
+            tipoEvaluacion = 'EXTRACURRICULAR';
+          } else if (materia.tipoMateriaId === hogarId) {
+            // HOGAR -> Hábitos en casa
+            tipoEvaluacion = 'CASA';
+          } else if (materia.tipoMateriaId === habitoId) {
+            // HABITO -> Puede ser COMPORTAMIENTO o APRENDIZAJE según el nombre
+            const comportamientos = [
+              'Respeta autoridad', 'Interactúa bien con sus compañeros', 'Respeta los derechos y propiedades de otros',
+              'Demuestra control de sí mismo', 'Acepta responsabilidad de sus acciones', 'RESPETA AUTORIDAD',
+              'INTERACTÚA BIEN CON SUS COMPAÑEROS', 'ACEPTA RESPONSABILIDAD DE SUS ACCIONES',
+              'PRÁCTICA VALORES MORALES DIARIAMENTE', 'RESPONSABLE EN CLASES', 'COMPLETA TRABAJOS A TIEMPO',
+              'PARTICIPA EN ACTIVIDADES DE APRENDIZAJE', 'LLEGA A TIEMPO', 'ATIENDE JUNTAS DE PADRES',
+              'PRÁCTICA DIARIMAENTE LO ESTUDIADO', 'RESPONSABLE EN CLASE', 'Completa Trabajos a Tiempo',
+              'Participa en actividades de aprendizaje', 'Respeta Autoridad', 'Práctica valores morales diariamente',
+              'Acepta responsabilidad de sus acciones', 'Interactúa bien con sus compañeros',
+              'Llega a tiempo', 'Respeta los derechos y propiedades de otros', 'LLEGA A TIEMPO',
+              'Atiende juntas de padres', 'Práctica diariamente lo estudiado'
+            ];
+            
+            if (comportamientos.includes(materia.nombre)) {
+              tipoEvaluacion = 'COMPORTAMIENTO';
+            } else {
+              // Los demás son de aprendizaje
+              tipoEvaluacion = 'APRENDIZAJE';
+            }
           } else {
-            // Los demás son de aprendizaje
-            tipoEvaluacion = 'APRENDIZAJE';
+            // Default
+            tipoEvaluacion = 'EXTRACURRICULAR';
           }
-        } else {
-          // Default
-          tipoEvaluacion = 'EXTRACURRICULAR';
-        }
 
-        const habito: HabitoEstudiante = {
-          id: ultimaCalificacion?.id,
-          evaluacionHabitoId: evaluacionIdParaCalificaciones, // Usar el ID de evaluación correcto
-          materiaId: materia.id, // Incluir el ID de la materia para extracurriculares
-          nombre: materia.nombre,
-          descripcion: materia.descripcion || `Evaluación de ${materia.nombre}`,
-          tipo: tipoEvaluacion,
-          tipoMateriaId: materia.tipoMateria?.id, // Incluir el tipoMateriaId correcto
-          grados: materia.grados || [], // Incluir los grados de la materia
-          u1: ultimaCalificacion?.u1 || null,
-          u2: ultimaCalificacion?.u2 || null,
-          u3: ultimaCalificacion?.u3 || null,
-          u4: ultimaCalificacion?.u4 || null,
-          comentario: ultimaCalificacion?.comentario || null,
-          createdAt: ultimaCalificacion?.createdAt || null,
-          updatedAt: ultimaCalificacion?.updatedAt || null,
-          calificaciones: calificacionesMateria,
-          esMateria: true
-        };
-        
-        resultado.push(habito);
-        evaluacionesProcesadas.add(materia.nombre.toLowerCase());
+          const habito: HabitoEstudiante = {
+            id: ultimaCalificacion?.id,
+            evaluacionHabitoId: evaluacionIdParaCalificaciones, // Usar el ID de evaluación correcto
+            materiaId: materia.id, // Incluir el ID de la materia para extracurriculares
+            nombre: materia.nombre,
+            descripcion: materia.descripcion || `Evaluación de ${materia.nombre}`,
+            tipo: tipoEvaluacion,
+            tipoMateriaId: materia.tipoMateria?.id, // Incluir el tipoMateriaId correcto
+            grados: materia.grados || [], // Incluir los grados de la materia
+            u1: ultimaCalificacion?.u1 || null,
+            u2: ultimaCalificacion?.u2 || null,
+            u3: ultimaCalificacion?.u3 || null,
+            u4: ultimaCalificacion?.u4 || null,
+            comentario: ultimaCalificacion?.comentario || null,
+            createdAt: ultimaCalificacion?.createdAt || null,
+            updatedAt: ultimaCalificacion?.updatedAt || null,
+            calificaciones: calificacionesMateria,
+            esMateria: true
+          };
+          
+          resultado.push(habito);
+          evaluacionesProcesadas.add(materia.nombre.toLowerCase());
+          console.log(`➕ Agregada materia con calificaciones: ${materia.nombre}`);
+        }
       }
       
       // 2. Procesar evaluaciones regulares (solo si no fueron procesadas como materia)
@@ -842,6 +907,12 @@ export class CalificacionHabitoService {
         if (!evaluacionesProcesadas.has(evaluacion.nombre.toLowerCase())) {
           const calificaciones = calificacionesPorEvaluacion.get(evaluacion.id) || [];
           const ultimaCalificacion = calificaciones[0];
+          
+          // 🔥 CORRECCIÓN: Solo incluir si hay calificaciones reales
+          if (!ultimaCalificacion) {
+            console.log(`⚠️ Omitiendo evaluación regular ${evaluacion.nombre} - no hay calificaciones existentes`);
+            continue;
+          }
           
           const habito: HabitoEstudiante = {
             id: ultimaCalificacion?.id,
@@ -867,7 +938,7 @@ export class CalificacionHabitoService {
       }
       
       // Ordenar el resultado: primero las evaluaciones regulares, luego las extracurriculares
-      return resultado.sort((a, b) => {
+      const resultadoFinal = resultado.sort((a, b) => {
         // Ordenar por tipo (primero las que no son EXTRACURRICULAR)
         if (a.tipo !== 'EXTRACURRICULAR' && b.tipo === 'EXTRACURRICULAR') return -1;
         if (a.tipo === 'EXTRACURRICULAR' && b.tipo !== 'EXTRACURRICULAR') return 1;
@@ -875,6 +946,13 @@ export class CalificacionHabitoService {
         // Si son del mismo tipo, ordenar por nombre
         return a.nombre.localeCompare(b.nombre);
       });
+      
+      console.log(`🔍 DEBUG - Resultado final a devolver: ${resultadoFinal.length} elementos`);
+      if (resultadoFinal.length > 0) {
+        console.log('🔍 DEBUG - Primer elemento del resultado:', JSON.stringify(resultadoFinal[0], null, 2));
+      }
+      
+      return resultadoFinal;
       
     } catch (error) {
       console.error('Error en obtenerCalificacionesPorEstudiante:', error);
@@ -894,10 +972,14 @@ export class CalificacionHabitoService {
     },
     docenteId: string
   ) {
+    console.log('🔍 actualizarCalificacionHabito - Iniciando:', { id, data, docenteId });
+    
     // Verificar si la calificación existe
     const [calificacionExistente] = await this.prisma.$queryRaw<CalificacionHabito[]>`
-      SELECT * FROM "CalificacionHabito" WHERE "id" = ${id}::uuid
+      SELECT * FROM "CalificacionHabito" WHERE "id" = ${id}
     `;
+
+    console.log('🔍 actualizarCalificacionHabito - Calificación encontrada:', !!calificacionExistente);
 
     if (!calificacionExistente) {
       throw new NotFoundException('Calificación no encontrada');
@@ -913,7 +995,7 @@ export class CalificacionHabitoService {
       // Verificamos si la materia existe y es extracurricular
       const [materia] = await this.prisma.$queryRaw<any[]>`
         SELECT id FROM "Materia" 
-        WHERE "id" = (SELECT "evaluacionHabitoId" FROM "CalificacionHabito" WHERE "id" = ${id}::uuid)
+        WHERE "id" = (SELECT "evaluacionHabitoId"::text FROM "CalificacionHabito" WHERE "id" = ${id})
         AND "esExtraescolar" = true
       `;
       
@@ -962,11 +1044,11 @@ export class CalificacionHabitoService {
     const query = `
       UPDATE "CalificacionHabito"
       SET ${updateFields.join(', ')}
-      WHERE "id" = $1::uuid
+      WHERE "id" = $1
       RETURNING *,
-        (SELECT row_to_json(eh) FROM "EvaluacionHabito" eh WHERE eh."id" = "evaluacionHabitoId") as "evaluacionHabito",
+        (SELECT row_to_json(eh) FROM "EvaluacionHabito" eh WHERE eh."id"::text = "evaluacionHabitoId"::text) as "evaluacionHabito",
         (SELECT json_build_object('id', u."id", 'nombre', u."nombre", 'apellido', u."apellido")
-         FROM "User" u WHERE u."id" = "docenteId") as "docente"
+         FROM "User" u WHERE u."id"::text = "docenteId"::text) as "docente"
     `;
 
     const [updated] = await this.prisma.$queryRawUnsafe(query, ...values) as any[];
@@ -990,9 +1072,9 @@ export class CalificacionHabitoService {
     // Verificar si ya existe una calificación para este estudiante, evaluación y período
     const [existing] = await this.prisma.$queryRaw<CalificacionHabito[]>`
       SELECT * FROM "CalificacionHabito"
-      WHERE "estudianteId" = ${estudianteId}::uuid
-      AND "evaluacionHabitoId" = ${evaluacionHabitoId}::uuid
-      AND "periodoId" = ${periodoId}::uuid
+      WHERE "estudianteId" = ${estudianteId}
+      AND "evaluacionHabitoId" = ${evaluacionHabitoId}
+      AND "periodoId" = ${periodoId}
     `;
 
     if (existing) {
@@ -1004,7 +1086,7 @@ export class CalificacionHabitoService {
     if (data.esExtraescolar) {
       const [materia] = await this.prisma.$queryRaw<any[]>`
         SELECT id FROM "Materia" 
-        WHERE "id" = ${evaluacionHabitoId}::uuid 
+        WHERE "id" = ${evaluacionHabitoId}
         AND "esExtraescolar" = true
       `;
       esMateriaExtra = !!materia;
@@ -1017,17 +1099,17 @@ export class CalificacionHabitoService {
         "u1", "u2", "u3", "u4", "comentario", "createdAt", "updatedAt",
         "esExtraescolar"
       ) VALUES (
-        gen_random_uuid(), ${estudianteId}::uuid, ${evaluacionHabitoId}::uuid, 
-        ${periodoId}::uuid, ${docenteId}::uuid,
+        gen_random_uuid(), ${estudianteId}, ${evaluacionHabitoId}, 
+        ${periodoId}, ${docenteId},
         ${data.u1 || null}, ${data.u2 || null}, 
         ${data.u3 || null}, ${data.u4 || null}, 
         ${data.comentario || null}, NOW(), NOW(),
         ${esMateriaExtra}
       )
       RETURNING *,
-        (SELECT row_to_json(eh) FROM "EvaluacionHabito" eh WHERE eh."id" = "evaluacionHabitoId") as "evaluacionHabito",
+        (SELECT row_to_json(eh) FROM "EvaluacionHabito" eh WHERE eh."id"::text = "evaluacionHabitoId"::text) as "evaluacionHabito",
         (SELECT json_build_object('id', u."id", 'nombre', u."nombre", 'apellido', u."apellido")
-         FROM "User" u WHERE u."id" = "docenteId") as "docente"
+         FROM "User" u WHERE u."id"::text = "docenteId"::text) as "docente"
     ` as any[];
 
     return result[0];
@@ -1045,16 +1127,18 @@ export class CalificacionHabitoService {
       evaluacionHabito_tipo: string;
     }
 
-    const calificaciones = await this.prisma.$queryRaw<CalificacionWithEvaluacion[]>`
+    const query = `
       SELECT ch.*, 
              eh."nombre" as "evaluacionHabito_nombre",
              eh."tipo" as "evaluacionHabito_tipo"
       FROM "CalificacionHabito" ch
       JOIN "EvaluacionHabito" eh ON ch."evaluacionHabitoId" = eh."id"
-      WHERE ch."estudianteId" = ${estudianteId}::uuid
-        AND ch."periodoId" = ${periodoId}::uuid
+      WHERE ch."estudianteId" = ${estudianteId}
+        AND ch."periodoId" = ${periodoId}
         AND eh."activo" = true
     `;
+
+    const calificaciones = await this.prisma.$queryRawUnsafe<CalificacionWithEvaluacion[]>(query);
 
     // Inicializar el resumen con arrays vacíos
     const resumen: ResumenHabitos = {
